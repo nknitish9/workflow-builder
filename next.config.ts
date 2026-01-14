@@ -2,6 +2,7 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+
   images: {
     remotePatterns: [
       {
@@ -10,16 +11,19 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config: import('webpack').Configuration) => {
-    config.externals.push({
+
+  webpack: (config) => {
+    config.externals = {
+      ...(config.externals || {}),
       'utf-8-validate': 'commonjs utf-8-validate',
       'bufferutil': 'commonjs bufferutil',
-    })
+    }
     return config
   },
+
   turbopack: {
-    root: ".",
+    root: process.cwd(),
   },
 }
 
-module.exports = nextConfig
+export default nextConfig
