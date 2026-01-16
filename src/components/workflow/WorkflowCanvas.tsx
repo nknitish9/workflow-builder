@@ -13,12 +13,18 @@ import 'reactflow/dist/style.css';
 import { useWorkflowStore } from '@/store/workflowStore';
 import TextNode from './nodes/TextNode';
 import ImageNode from './nodes/ImageNode';
+import VideoNode from './nodes/VideoNode';
 import LLMNode from './nodes/LLMNode';
+import CropImageNode from './nodes/CropImageNode';
+import ExtractFrameNode from './nodes/ExtractFrameNode';
 
 const nodeTypes = {
   text: TextNode,
   image: ImageNode,
+  video: VideoNode,
   llm: LLMNode,
+  crop: CropImageNode,
+  extract: ExtractFrameNode,
 };
 
 function FlowCanvas() {
@@ -33,7 +39,10 @@ function FlowCanvas() {
     onConnect,
     addTextNode,
     addImageNode,
+    addVideoNode,
     addLLMNode,
+    addCropImageNode,
+    addExtractFrameNode,
   } = useWorkflowStore();
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -53,15 +62,43 @@ function FlowCanvas() {
         y: event.clientY,
       });
 
-      if (type === 'text') addTextNode(position);
-      if (type === 'image') addImageNode(position);
-      if (type === 'llm') addLLMNode(position);
+      switch (type) {
+        case 'text':
+          addTextNode(position);
+          break;
+        case 'image':
+          addImageNode(position);
+          break;
+        case 'video':
+          addVideoNode(position);
+          break;
+        case 'llm':
+          addLLMNode(position);
+          break;
+        case 'crop':
+          addCropImageNode(position);
+          break;
+        case 'extract':
+          addExtractFrameNode(position);
+          break;
+      }
     },
-    [screenToFlowPosition, addTextNode, addImageNode, addLLMNode]
+    [
+      screenToFlowPosition,
+      addTextNode,
+      addImageNode,
+      addVideoNode,
+      addLLMNode,
+      addCropImageNode,
+      addExtractFrameNode,
+    ]
   );
 
   return (
-    <div ref={reactFlowWrapper} className="flex-1 h-full bg-gradient-to-br from-slate-50/50 to-blue-50/30">
+    <div
+      ref={reactFlowWrapper}
+      className="flex-1 h-full bg-gradient-to-br from-slate-50/50 to-blue-50/30"
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -81,13 +118,12 @@ function FlowCanvas() {
         }}
         className="bg-transparent"
       >
-        {/* DOT GRID BACKGROUND */}
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1.5}
           color="gray"
-          className="opacity-60"
+          className="opacity-40"
         />
 
         <MiniMap
@@ -98,8 +134,14 @@ function FlowCanvas() {
                 return '#3b82f6';
               case 'image':
                 return '#10b981';
+              case 'video':
+                return '#f97316';
               case 'llm':
                 return '#8b5cf6';
+              case 'crop':
+                return '#eab308';
+              case 'extract':
+                return '#ec4899';
               default:
                 return '#64748b';
             }
@@ -111,7 +153,6 @@ function FlowCanvas() {
 
         <Controls className="bg-white/90 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200" />
       </ReactFlow>
-
     </div>
   );
 }

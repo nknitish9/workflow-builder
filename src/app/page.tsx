@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Sidebar } from '@/components/workflow/Sidebar';
+import { RightSidebar } from '@/components/workflow/RightSidebar';
 import { Toolbar } from '@/components/workflow/Toolbar';
 import { WorkflowCanvas } from '@/components/workflow/WorkflowCanvas';
 import { useWorkflowStore } from '@/store/workflowStore';
@@ -9,9 +10,8 @@ import { useWorkflowStore } from '@/store/workflowStore';
 export default function Home() {
   const { saveToHistory } = useWorkflowStore();
 
-  // Load sample workflow on mount
   useEffect(() => {
-    // Create sample workflow- Product Listing Generator
+    // Load sample workflow - Product Marketing Kit Generator
     const sampleWorkflow = createSampleWorkflow();
     useWorkflowStore.setState({
       nodes: sampleWorkflow.nodes,
@@ -26,135 +26,113 @@ export default function Home() {
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
         <WorkflowCanvas />
+        <RightSidebar />
       </div>
     </div>
   );
 }
 
-// Helper function to create the sample workflow
+// Sample workflow: Product Marketing Kit Generator
 function createSampleWorkflow() {
   const nodes = [
-    // Image Nodes
+    // Branch A: Image Processing
     {
-      id: 'img-1',
+      id: 'upload-img',
       type: 'image',
-      position: { x: 60, y: 360 },
-      data: { label: 'Product Photo 1' },
+      position: { x: 100, y: 100 },
+      data: { label: 'Product Photo' },
     },
     {
-      id: 'img-2',
-      type: 'image',
-      position: { x: 60, y: 600 },
-      data: { label: 'Product Photo 2' },
+      id: 'crop-img',
+      type: 'crop',
+      position: { x: 400, y: 100 },
+      data: {
+        label: 'Crop Product',
+        xPercent: 10,
+        yPercent: 10,
+        widthPercent: 80,
+        heightPercent: 80,
+      },
     },
-    {
-      id: 'img-3',
-      type: 'image',
-      position: { x: 60, y: 840 },
-      data: { label: 'Product Photo 3' },
-    },
-    // Text Nodes
     {
       id: 'text-system',
       type: 'text',
-      position: { x: 225, y: 50 },
+      position: { x: 100, y: 300 },
       data: {
         label: 'System Prompt',
-        text: 'You are a product analysis expert. Analyze the provided product images in detail.',
+        text: 'You are a professional marketing copywriter. Generate compelling product descriptions.',
       },
     },
     {
       id: 'text-product',
       type: 'text',
-      position: { x: -150, y: 70 },
+      position: { x: 100, y: 500 },
       data: {
-        label: 'Product Info',
-        text: 'Product: Premium Wireless Headphones\nBrand: AudioTech\nKey Features: Noise cancellation, 30hr battery, Bluetooth 5.0',
+        label: 'Product Details',
+        text: 'Product: Wireless Bluetooth Headphones\nFeatures: Noise cancellation, 30-hour battery, foldable design.',
       },
     },
-    // LLM Nodes
     {
-      id: 'llm-analyze',
+      id: 'llm-describe',
       type: 'llm',
-      position: { x: 600, y: 400 },
+      position: { x: 750, y: 250 },
       data: {
-        label: 'Analyze Product',
-        model: 'gemini-1.5-flash',
+        label: 'Generate Description',
+        model: 'gemini-2.5-flash',
       },
     },
+    // Branch B: Video Processing
     {
-      id: 'llm-amazon',
-      type: 'llm',
-      position: { x: 1440, y: 100 },
-      data: {
-        label: 'Amazon Listing',
-        model: 'gemini-1.5-flash',
-      },
+      id: 'upload-video',
+      type: 'video',
+      position: { x: 100, y: 700 },
+      data: { label: 'Product Demo Video' },
     },
     {
-      id: 'llm-instagram',
-      type: 'llm',
-      position: { x: 1440, y: 400 },
+      id: 'extract-frame',
+      type: 'extract',
+      position: { x: 400, y: 700 },
       data: {
-        label: 'Instagram Caption',
-        model: 'gemini-1.5-flash',
+        label: 'Extract Frame',
+        timestamp: '50%',
       },
     },
+    // Convergence: Final Marketing
     {
-      id: 'llm-seo',
-      type: 'llm',
-      position: { x: 1440, y: 700 },
-      data: {
-        label: 'SEO Meta Description',
-        model: 'gemini-1.5-flash',
-      },
-    },
-    // Prompt Text Nodes for second tier LLMs
-    {
-      id: 'text-amazon-prompt',
+      id: 'text-final-system',
       type: 'text',
-      position: { x: 1050, y: 40 },
+      position: { x: 750, y: 600 },
       data: {
-        label: 'Amazon Prompt',
-        text: 'Based on the product analysis, write a compelling Amazon product listing with title, bullet points, and description.',
+        label: 'Social Media Prompt',
+        text: 'Create a tweet-length marketing post based on the product description and images.',
       },
     },
     {
-      id: 'text-instagram-prompt',
-      type: 'text',
-      position: { x: 1050, y: 340 },
+      id: 'llm-final',
+      type: 'llm',
+      position: { x: 1150, y: 450 },
       data: {
-        label: 'Instagram Prompt',
-        text: 'Based on the product analysis, write an engaging Instagram caption with relevant hashtags.',
-      },
-    },
-    {
-      id: 'text-seo-prompt',
-      type: 'text',
-      position: { x: 1050, y: 740 },
-      data: {
-        label: 'SEO Prompt',
-        text: 'Based on the product analysis, write an SEO-optimized meta description under 160 characters.',
+        label: 'Final Marketing Post',
+        model: 'gemini-2.5-flash',
       },
     },
   ];
 
   const edges = [
-    // Images to analyze LLM
-    { id: 'e1', source: 'img-1', target: 'llm-analyze', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e2', source: 'img-2', target: 'llm-analyze', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e3', source: 'img-3', target: 'llm-analyze', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
-    // Text nodes to analyze LLM
-    { id: 'e4', source: 'text-system', target: 'llm-analyze', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e5', source: 'text-product', target: 'llm-analyze', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    // Analyze LLM to second tier LLMs
-    { id: 'e6', source: 'llm-analyze', target: 'llm-amazon', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e7', source: 'llm-analyze', target: 'llm-instagram', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e8', source: 'llm-analyze', target: 'llm-seo', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    // Prompts to second tier LLMs
-    { id: 'e9', source: 'text-amazon-prompt', target: 'llm-amazon', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e10', source: 'text-instagram-prompt', target: 'llm-instagram', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e11', source: 'text-seo-prompt', target: 'llm-seo', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
+    // Branch A connections
+    { id: 'e1', source: 'upload-img', target: 'crop-img', targetHandle: 'image_url', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e2', source: 'text-system', target: 'llm-describe', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e3', source: 'text-product', target: 'llm-describe', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e4', source: 'crop-img', target: 'llm-describe', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
+    
+    // Branch B connections
+    { id: 'e5', source: 'upload-video', target: 'extract-frame', targetHandle: 'video_url', animated: true, style: { stroke: '#8b5cf6' } },
+    
+    // Convergence connections
+    { id: 'e6', source: 'text-final-system', target: 'llm-final', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e7', source: 'llm-describe', target: 'llm-final', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e8', source: 'crop-img', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e9', source: 'extract-frame', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
   ];
 
   return { nodes, edges };

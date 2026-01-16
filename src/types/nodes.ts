@@ -1,7 +1,8 @@
-export type NodeType = 'text' | 'image' | 'llm';
+export type NodeType = 'text' | 'image' | 'video' | 'llm' | 'crop' | 'extract';
 
 export interface BaseNodeData {
   label: string;
+  isProcessing?: boolean;
 }
 
 export interface TextNodeData extends BaseNodeData {
@@ -11,6 +12,12 @@ export interface TextNodeData extends BaseNodeData {
 export interface ImageNodeData extends BaseNodeData {
   imageUrl?: string;
   imageData?: string;
+  fileName?: string;
+}
+
+export interface VideoNodeData extends BaseNodeData {
+  videoUrl?: string;
+  videoData?: string;
   fileName?: string;
 }
 
@@ -24,4 +31,30 @@ export interface LLMNodeData extends BaseNodeData {
   error?: string;
 }
 
-export type NodeData = TextNodeData | ImageNodeData | LLMNodeData;
+export interface CropImageNodeData extends BaseNodeData {
+  imageUrl?: string;
+  xPercent: number;
+  yPercent: number;
+  widthPercent: number;
+  heightPercent: number;
+  centerCrop?: boolean;
+  result?: string;
+  isLoading?: boolean;
+  error?: string;
+}
+
+export interface ExtractFrameNodeData extends BaseNodeData {
+  videoUrl?: string;
+  timestamp: string;
+  result?: string;
+  isLoading?: boolean;
+  error?: string;
+}
+
+export type NodeData =
+  | TextNodeData
+  | ImageNodeData
+  | VideoNodeData
+  | LLMNodeData
+  | CropImageNodeData
+  | ExtractFrameNodeData;

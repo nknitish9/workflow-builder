@@ -16,7 +16,7 @@ function TextNode({ id, data }: NodeProps<TextNodeData>) {
 
   return (
     <Card className="w-72 bg-gradient-to-br from-white to-blue-50/30 border border-blue-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-blue-100/50 flex items-center gap-3 relative">
+      <div className="p-4 border-b rounded-t-lg border-blue-100 bg-gradient-to-r from-blue-50 to-blue-100/50 flex items-center gap-3 relative">
         <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-blue-400 to-blue-600 flex items-center justify-center shadow-sm">
           <Type className="h-4 w-4 text-white" />
         </div>

@@ -16,12 +16,34 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
+  const setNodeProcessing = useWorkflowStore((state) => state.setNodeProcessing);
   const { getEdges, getNodes } = useReactFlow();
   const runLLM = trpc.llm.run.useMutation();
+  
+  // History tracking mutations
+  const createRun = trpc.execution.createRun.useMutation();
+  const updateRun = trpc.execution.updateRun.useMutation();
+  const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
 
   const handleRun = async () => {
+    updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
+    setNodeProcessing(id, true);
+    
+    // Force UI update before heavy processing
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const startTime = Date.now();
+    let runId: string | undefined;
+
     try {
-      updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
+      // Create run entry
+      const run = await createRun.mutateAsync({
+        runType: 'single',
+        nodeCount: 1,
+      });
+      runId = run.id;
+
+      console.log('Starting crop operation...');
 
       const edges = getEdges();
       const nodes = getNodes();
@@ -72,6 +94,20 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
         })
         .filter(Boolean) as Array<{ mimeType: string; data: string }>;
 
+      // Log node execution start
+      await addNodeExecution.mutateAsync({
+        runId,
+        nodeId: id,
+        nodeType: 'llm',
+        status: 'running',
+        inputs: {
+          model: data.model,
+          systemPrompt,
+          userMessage,
+          imageCount: images.length,
+        },
+      });
+
       const result = await runLLM.mutateAsync({
         model: data.model,
         systemPrompt: systemPrompt || undefined,
@@ -79,19 +115,67 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
         images: images.length > 0 ? images : undefined,
       });
 
+      const duration = Date.now() - startTime;
+
+      // Log successful execution
+      await addNodeExecution.mutateAsync({
+        runId,
+        nodeId: id,
+        nodeType: 'llm',
+        status: 'success',
+        inputs: {
+          model: data.model,
+          systemPrompt,
+          userMessage: userMessage.substring(0, 100) + '...',
+        },
+        outputs: { result: result.result.substring(0, 200) + '...' },
+        duration,
+      });
+
+      // Update run as successful
+      await updateRun.mutateAsync({
+        runId,
+        status: 'success',
+        duration,
+      });
+
       updateNodeData(id, { result: result.result, isLoading: false });
+      setNodeProcessing(id, false);
     } catch (error) {
       console.error('LLM execution error:', error);
+      const duration = Date.now() - startTime;
+
+      if (runId) {
+        // Log failed execution
+        await addNodeExecution.mutateAsync({
+          runId,
+          nodeId: id,
+          nodeType: 'llm',
+          status: 'failed',
+          inputs: { model: data.model },
+          error: error instanceof Error ? error.message : 'Unknown error',
+          duration,
+        });
+
+        // Update run as failed
+        await updateRun.mutateAsync({
+          runId,
+          status: 'failed',
+          duration,
+        });
+      }
+
       updateNodeData(id, {
         error: error instanceof Error ? error.message : 'Failed to run LLM',
         isLoading: false,
       });
+      setNodeProcessing(id, false);
     }
   };
 
   return (
-    <Card className="w-80 bg-gradient-to-br from-white to-purple-50/30 border border-purple-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-purple-100/50 flex items-center gap-3 relative">
+    <Card className={`w-80 bg-gradient-to-br from-white to-purple-50/30 border border-purple-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
+      <div className="p-4 border-b rounded-t-lg border-purple-100 bg-gradient-to-r from-purple-50 to-purple-100/50 flex items-center gap-3 relative">
         <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-purple-400 to-purple-600 flex items-center justify-center shadow-sm">
           <Bot className="h-4 w-4 text-white" />
         </div>

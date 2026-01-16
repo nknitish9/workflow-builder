@@ -10,7 +10,14 @@ import {
   Connection,
 } from 'reactflow';
 import { v4 as uuidv4 } from 'uuid';
-import { TextNodeData, ImageNodeData, LLMNodeData } from '@/types/nodes';
+import { 
+  TextNodeData, 
+  ImageNodeData, 
+  VideoNodeData, 
+  LLMNodeData, 
+  CropImageNodeData, 
+  ExtractFrameNodeData 
+} from '@/types/nodes';
 
 interface WorkflowState {
   nodes: Node[];
@@ -20,12 +27,16 @@ interface WorkflowState {
   onConnect: (connection: Connection) => void;
   addTextNode: (position: { x: number; y: number }) => void;
   addImageNode: (position: { x: number; y: number }) => void;
+  addVideoNode: (position: { x: number; y: number }) => void;
   addLLMNode: (position: { x: number; y: number }) => void;
-  updateNodeData: (nodeId: string, data: Partial<TextNodeData | ImageNodeData | LLMNodeData>) => void;
+  addCropImageNode: (position: { x: number; y: number }) => void;
+  addExtractFrameNode: (position: { x: number; y: number }) => void;
+  updateNodeData: (nodeId: string, data: any) => void;
   deleteNode: (nodeId: string) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   clearWorkflow: () => void;
+  setNodeProcessing: (nodeId: string, isProcessing: boolean) => void;
   // Undo/Redo
   history: Array<{ nodes: Node[]; edges: Edge[] }>;
   currentIndex: number;
@@ -53,14 +64,13 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   onConnect: (connection) => {
-    // Type-safe connection validation
     const sourceNode = get().nodes.find((n) => n.id === connection.source);
     const targetNode = get().nodes.find((n) => n.id === connection.target);
 
     if (!sourceNode || !targetNode) return;
     if (!connection.source || !connection.target) return;
 
-    // Prevent cycles (DAG validation)
+    // DAG validation
     const wouldCreateCycle = (targetId: string, sourceId: string): boolean => {
       const visited = new Set<string>();
       const queue = [sourceId];
@@ -82,25 +92,31 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return;
     }
 
-    // Type validation for handles
+    // Type validation
     const targetHandle = connection.targetHandle;
 
     // Image outputs can only connect to image inputs
-    if (sourceNode.type === 'image' && targetHandle !== 'images') {
+    if (sourceNode.type === 'image' && targetHandle !== 'images' && targetHandle !== 'image_url') {
       console.warn('Image nodes can only connect to image inputs');
       return;
     }
 
-    // Text outputs cannot connect to image inputs
-    if (sourceNode.type === 'text' && targetHandle === 'images') {
-      console.warn('Text nodes cannot connect to image inputs');
+    // Video outputs can only connect to video inputs
+    if (sourceNode.type === 'video' && targetHandle !== 'video_url') {
+      console.warn('Video nodes can only connect to video inputs');
+      return;
+    }
+
+    // Text outputs cannot connect to image/video inputs
+    if (sourceNode.type === 'text' && (targetHandle === 'images' || targetHandle === 'image_url' || targetHandle === 'video_url')) {
+      console.warn('Text nodes cannot connect to media inputs');
       return;
     }
 
     if (!targetHandle) return;
 
     set({
-      edges: addEdge({ ...connection, animated: true, style: { stroke: '#8b5cf6' } }, get().edges),
+      edges: addEdge({ ...connection, animated: true, style: { stroke: '#8b5cf6', strokeWidth: 2 } }, get().edges),
     });
     get().saveToHistory();
   },
@@ -127,6 +143,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     get().saveToHistory();
   },
 
+  addVideoNode: (position) => {
+    const newNode: Node<VideoNodeData> = {
+      id: uuidv4(),
+      type: 'video',
+      position,
+      data: { label: 'Video Node' },
+    };
+    set({ nodes: [...get().nodes, newNode] });
+    get().saveToHistory();
+  },
+
   addLLMNode: (position) => {
     const newNode: Node<LLMNodeData> = {
       id: uuidv4(),
@@ -134,7 +161,38 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       position,
       data: {
         label: 'LLM Node',
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
+      },
+    };
+    set({ nodes: [...get().nodes, newNode] });
+    get().saveToHistory();
+  },
+
+  addCropImageNode: (position) => {
+    const newNode: Node<CropImageNodeData> = {
+      id: uuidv4(),
+      type: 'crop',
+      position,
+      data: {
+        label: 'Crop Image',
+        xPercent: 0,
+        yPercent: 0,
+        widthPercent: 100,
+        heightPercent: 100,
+      },
+    };
+    set({ nodes: [...get().nodes, newNode] });
+    get().saveToHistory();
+  },
+
+  addExtractFrameNode: (position) => {
+    const newNode: Node<ExtractFrameNodeData> = {
+      id: uuidv4(),
+      type: 'extract',
+      position,
+      data: {
+        label: 'Extract Frame',
+        timestamp: '0',
       },
     };
     set({ nodes: [...get().nodes, newNode] });
@@ -145,6 +203,16 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     set({
       nodes: get().nodes.map((node) =>
         node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
+      ),
+    });
+  },
+
+  setNodeProcessing: (nodeId, isProcessing) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        node.id === nodeId
+          ? { ...node, data: { ...node.data, isProcessing } }
+          : node
       ),
     });
   },

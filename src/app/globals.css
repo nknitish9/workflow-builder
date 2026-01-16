@@ -60,9 +60,10 @@
   }
 }
 
+/* React Flow Node Styles */
 .react-flow__node {
   cursor: default;
-  border-radius: 12px;
+  border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -73,9 +74,73 @@
 }
 
 .react-flow__node.selected {
-  box-shadow: 0 0 0 2px #3b82f6, 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 3px #3b82f6, 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
+/* PULSATING GLOW EFFECT FOR PROCESSING NODES */
+@keyframes pulsatingGlow {
+  0%, 100% {
+    box-shadow: 
+      /* Primary glow layers - very tight */
+      0 0 4px 0.5px rgba(139, 92, 246, 0.8),
+      0 0 8px 1px rgba(139, 92, 246, 0.5),
+      0 0 12px 2px rgba(139, 92, 246, 0.3),
+      /* Depth shadow */
+      0 6px 12px -3px rgba(0, 0, 0, 0.15);
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  
+  50% {
+    box-shadow: 
+      /* Primary glow layers - tight expansion */
+      0 0 6px 1px rgba(139, 92, 246, 1),
+      0 0 12px 2px rgba(139, 92, 246, 0.7),
+      0 0 18px 3px rgba(139, 92, 246, 0.4),
+      /* Depth shadow - lifted */
+      0 10px 20px -5px rgba(0, 0, 0, 0.2);
+    transform: scale(1.01);
+    filter: brightness(1.05);
+  }
+}
+
+/* Apply to both react-flow nodes and card components */
+.react-flow__node.processing,
+.processing {
+  animation: pulsatingGlow 1.5s ease-in-out infinite !important;
+  border: 2px solid #8b5cf6 !important;
+  position: relative;
+  z-index: 100;
+}
+
+/* Extra glow ring for processing nodes */
+.react-flow__node.processing::before,
+.processing::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border-radius: 8px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, transparent 70%);
+  animation: pulseRing 1.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes pulseRing {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* React Flow Handle Styles */
 .react-flow__handle {
   width: 12px;
   height: 12px;
@@ -91,15 +156,30 @@
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
+/* Purple Animated Edges */
 .react-flow__edge-path {
+  stroke: #8b5cf6 !important;
   stroke-width: 2;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
   stroke-width: 3;
+  stroke: #7c3aed !important;
 }
 
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* MiniMap Styles */
 .react-flow__minimap {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -111,6 +191,7 @@
   rx: 4;
 }
 
+/* Controls Styles */
 .react-flow__controls {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.2);
@@ -133,25 +214,14 @@
 /* Prevent text selection in nodes */
 .react-flow__node-text,
 .react-flow__node-image,
-.react-flow__node-llm {
+.react-flow__node-video,
+.react-flow__node-llm,
+.react-flow__node-crop,
+.react-flow__node-extract {
   user-select: none;
 }
 
 /* Nodrag class for interactive elements */
 .nodrag {
   cursor: auto !important;
-}
-
-/* Custom node animations */
-@keyframes nodePulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.02);
-  }
-}
-
-.react-flow__node.processing {
-  animation: nodePulse 2s ease-in-out infinite;
 }

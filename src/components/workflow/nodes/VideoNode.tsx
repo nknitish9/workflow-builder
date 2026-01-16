@@ -5,10 +5,10 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useWorkflowStore } from '@/store/workflowStore';
-import { ImageNodeData } from '@/types/nodes';
-import { Image as ImageIcon, Upload, X, Trash2 } from 'lucide-react';
+import { VideoNodeData } from '@/types/nodes';
+import { Video, Upload, X, Trash2 } from 'lucide-react';
 
-function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
+function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -21,25 +21,25 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
       updateNodeData(id, {
-        imageData: base64,
+        videoData: base64,
         fileName: file.name,
       });
     };
     reader.readAsDataURL(file);
   };
 
-  const handleClearImage = () => {
-    updateNodeData(id, { imageData: undefined, fileName: undefined });
+  const handleClearVideo = () => {
+    updateNodeData(id, { videoData: undefined, fileName: undefined });
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   return (
-    <Card className="w-72 bg-gradient-to-br from-white to-green-50/30 border border-green-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b rounded-t-lg border-green-100 bg-gradient-to-r from-green-50 to-green-100/50 flex items-center gap-3 relative">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center shadow-sm">
-          <ImageIcon className="h-4 w-4 text-white" />
+    <Card className="w-72 bg-gradient-to-br from-white to-orange-50/30 border border-orange-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
+      <div className="p-4 border-b rounded-t-lg border-orange-100 bg-gradient-to-r from-orange-50 to-orange-100/50 flex items-center gap-3 relative">
+        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center shadow-sm">
+          <Video className="h-4 w-4 text-white" />
         </div>
         <span className="font-bold text-sm text-slate-800">{data.label}</span>
         <Button
@@ -52,38 +52,38 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
         </Button>
       </div>
       <div className="p-4 space-y-3">
-        {!data.imageData ? (
-          <div className="border-2 border-dashed border-green-300/60 rounded-xl p-8 text-center bg-gradient-to-br from-green-50/50 to-green-100/30 hover:from-green-100/50 hover:to-green-50/50 transition-all duration-300">
+        {!data.videoData ? (
+          <div className="border-2 border-dashed border-orange-300/60 rounded-xl p-8 text-center bg-gradient-to-br from-orange-50/50 to-orange-100/30 hover:from-orange-100/50 hover:to-orange-50/50 transition-all duration-300">
             <Button
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
-              className="nodrag bg-white/80 hover:bg-white border-green-300 hover:border-green-400 transition-all duration-200 shadow-sm"
+              className="nodrag bg-white/80 hover:bg-white border-orange-300 hover:border-orange-400 transition-all duration-200 shadow-sm"
             >
               <Upload className="h-4 w-4 mr-2" />
-              Upload Image
+              Upload Video
             </Button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="video/*"
               onChange={handleFileChange}
               className="hidden"
             />
-            <p className="text-xs text-slate-500 mt-3 font-medium">JPG, PNG, GIF</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">MP4, MOV, WEBM</p>
           </div>
         ) : (
-          <div className="relative group/img">
-            <img
-              src={data.imageData}
-              alt={data.fileName || 'Uploaded'}
-              className="w-full h-40 object-cover rounded-lg border border-green-200 shadow-sm"
+          <div className="relative group/video">
+            <video
+              src={data.videoData}
+              controls
+              className="w-full h-40 rounded-lg border border-orange-200 shadow-sm"
             />
             <Button
               variant="destructive"
               size="icon"
-              className="absolute top-2 right-2 h-7 w-7 nodrag opacity-0 group-hover/img:opacity-100 transition-all duration-200 shadow-lg hover:scale-110"
-              onClick={handleClearImage}
+              className="absolute top-2 right-2 h-7 w-7 nodrag opacity-0 group-hover/video:opacity-100 transition-all duration-200 shadow-lg hover:scale-110"
+              onClick={handleClearVideo}
             >
               <X className="h-4 w-4" />
             </Button>
@@ -95,10 +95,10 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
         type="source"
         position={Position.Right}
         id="output"
-        className="w-4 h-4 bg-gradient-to-r from-green-400 to-green-600 border-2 border-white shadow-sm"
+        className="w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-600 border-2 border-white shadow-sm"
       />
     </Card>
   );
 }
 
-export default memo(ImageNode);
+export default memo(VideoNode);
