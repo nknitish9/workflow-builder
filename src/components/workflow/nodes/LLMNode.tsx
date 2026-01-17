@@ -43,8 +43,6 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
       });
       runId = run.id;
 
-      console.log('Starting crop operation...');
-
       const edges = getEdges();
       const nodes = getNodes();
 

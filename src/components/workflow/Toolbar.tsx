@@ -33,18 +33,18 @@ function stripBinaryData(nodes: any[]) {
       // Remove image/video data URLs (keep metadata)
       if (cleanData.imageData && typeof cleanData.imageData === 'string' && cleanData.imageData.startsWith('data:')) {
         delete cleanData.imageData;
-        cleanData.hasImageData = true; // Flag to indicate image was present
+        cleanData.hasImageData = true;
       }
       
       if (cleanData.videoData && typeof cleanData.videoData === 'string' && cleanData.videoData.startsWith('data:')) {
         delete cleanData.videoData;
-        cleanData.hasVideoData = true; // Flag to indicate video was present
+        cleanData.hasVideoData = true;
       }
 
       // Remove result images from crop/extract nodes
       if (cleanData.result && typeof cleanData.result === 'string' && cleanData.result.startsWith('data:')) {
         delete cleanData.result;
-        cleanData.hasResult = true; // Flag to indicate result was present
+        cleanData.hasResult = true;
       }
       
       // Remove large image arrays from LLM nodes
@@ -73,16 +73,7 @@ export function Toolbar() {
 
   const handleSave = async () => {
     try {
-      // Strip binary data before saving
       const cleanNodes = stripBinaryData(nodes);
-      
-      console.log('Saving workflow:', {
-        name: workflowName,
-        nodeCount: cleanNodes.length,
-        edgeCount: edges.length,
-        originalSize: JSON.stringify({ nodes, edges }).length,
-        cleanSize: JSON.stringify({ nodes: cleanNodes, edges }).length,
-      });
 
       await saveWorkflow.mutateAsync({
         name: workflowName,
@@ -99,7 +90,6 @@ export function Toolbar() {
   };
 
   const handleExport = () => {
-    // Export with binary data for local use
     const workflow = {
       name: workflowName,
       nodes,
@@ -157,85 +147,137 @@ export function Toolbar() {
       alert('No nodes to execute');
       return;
     }
-
     setIsExecuting(true);
     const startTime = Date.now();
-    let runId: string | undefined;
 
     try {
-      // Create workflow run
-      const run = await createRun.mutateAsync({
-        runType: selectedNodes.length > 0 ? 'partial' : 'full',
-        nodeCount: nodesToRun.length,
-      });
-      runId = run.id;
-
       // Get edges for selected nodes only
       const nodeIds = new Set(nodesToRun.map(n => n.id));
       const relevantEdges = edges.filter(e => 
         nodeIds.has(e.source) && nodeIds.has(e.target)
       );
 
-      // Create executor
-      const executor = new WorkflowExecutor(nodesToRun, relevantEdges);
+      // CRITICAL FIX: Pass ALL nodes to executor (for data access), but only execute selected ones
+      const executor = new WorkflowExecutor(
+        nodesToRun,      // Nodes to execute
+        relevantEdges    // Edges between them
+      );
 
       // Execute with progress tracking
       const results = await executor.execute((nodeId, status) => {
-        setNodeProcessing(nodeId, status === 'running');
-        
-        if (status === 'success' || status === 'failed') {
-          const result = Array.from(results.values()).find(r => r.nodeId === nodeId);
-          if (result) {
-            // Update node data with result
-            const node = nodes.find(n => n.id === nodeId);
-            if (node && result.output) {
-              updateNodeData(nodeId, { result: result.output });
-            }
-          }
+        if (status === 'running') {
+          setNodeProcessing(nodeId, true);
+          updateNodeData(nodeId, { 
+            isProcessing: true, 
+            isLoading: true,
+            error: undefined 
+          });
+        } else if (status === 'success') {
+          const executorResults = (executor as any).results;
+          const result = executorResults.get(nodeId);
+          
+          setTimeout(() => {
+            setNodeProcessing(nodeId, false);
+            updateNodeData(nodeId, { 
+              isProcessing: false, 
+              isLoading: false,
+              result: result,
+              error: undefined 
+            });
+          }, 300);
+        } else if (status === 'failed') {
+          setTimeout(() => {
+            setNodeProcessing(nodeId, false);
+            updateNodeData(nodeId, { 
+              isProcessing: false, 
+              isLoading: false 
+            });
+          }, 300);
         }
       });
 
-      // Log all node executions
-      for (const [nodeId, result] of results) {
-        const node = nodes.find(n => n.id === nodeId);
-        await addNodeExecution.mutateAsync({
-          runId,
-          nodeId,
-          nodeType: node?.type || 'unknown',
-          status: result.status,
-          inputs: node?.data || {},
-          outputs: result.output ? { result: String(result.output).substring(0, 500) } : undefined,
-          error: result.error,
-          duration: result.duration,
-        });
-      }
-
-      // Update run status
-      const duration = Date.now() - startTime;
-      const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
-      await updateRun.mutateAsync({
-        runId,
-        status: hasFailures ? 'partial' : 'success',
-        duration,
+      // Update all nodes with final results
+      results.forEach((result, nodeId) => {
+        if (result.status === 'success' && result.output) {
+          updateNodeData(nodeId, { 
+            result: result.output, 
+            error: undefined,
+            isProcessing: false,
+            isLoading: false 
+          });
+        } else if (result.status === 'failed' && result.error) {
+          updateNodeData(nodeId, { 
+            error: result.error, 
+            result: undefined,
+            isProcessing: false,
+            isLoading: false 
+          });
+        }
       });
 
-      alert(`Workflow executed successfully! ${results.size} nodes processed in ${(duration / 1000).toFixed(1)}s`);
+      const duration = Date.now() - startTime;
+      const successCount = Array.from(results.values()).filter(r => r.status === 'success').length;
+      const failCount = Array.from(results.values()).filter(r => r.status === 'failed').length;
+
+      alert(`Workflow completed!\n✓ ${successCount} succeeded\n✗ ${failCount} failed\nTime: ${(duration / 1000).toFixed(1)}s`);
+
+      // Try to save history
+      try {
+        const run = await createRun.mutateAsync({
+          runType: selectedNodes.length > 0 ? 'partial' : 'full',
+          nodeCount: nodesToRun.length,
+        });
+
+        for (const [nodeId, result] of results) {
+          const node = nodes.find(n => n.id === nodeId);
+          
+          let outputForDb;
+          if (result.output) {
+            if (typeof result.output === 'string' && result.output.startsWith('data:')) {
+              outputForDb = { 
+                type: 'media',
+                format: result.output.substring(0, 30),
+                size: result.output.length 
+              };
+            } else if (typeof result.output === 'string' && result.output.length > 1000) {
+              outputForDb = { 
+                result: result.output.substring(0, 1000) + '... (truncated)'
+              };
+            } else {
+              outputForDb = { result: String(result.output).substring(0, 1000) };
+            }
+          }
+          
+          await addNodeExecution.mutateAsync({
+            runId: run.id,
+            nodeId,
+            nodeType: node?.type || 'unknown',
+            status: result.status,
+            inputs: node?.data || {},
+            outputs: outputForDb,
+            error: result.error,
+            duration: result.duration,
+          });
+        }
+
+        const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
+        await updateRun.mutateAsync({
+          runId: run.id,
+          status: hasFailures ? 'partial' : 'success',
+          duration,
+        });
+      } catch (dbError) {
+        console.warn('Failed to save history (database unavailable):', dbError);
+      }
     } catch (error) {
       console.error('Workflow execution error:', error);
-      
-      if (runId) {
-        await updateRun.mutateAsync({
-          runId,
-          status: 'failed',
-          duration: Date.now() - startTime,
-        });
-      }
-      
       alert(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
-      // Clear processing state from all nodes
-      nodes.forEach(node => setNodeProcessing(node.id, false));
+      nodes.forEach(node => {
+        setNodeProcessing(node.id, false);
+        updateNodeData(node.id, { isProcessing: false, isLoading: false });
+      });
     }
   };
 
@@ -247,7 +289,6 @@ export function Toolbar() {
       return;
     }
     
-    // Use same logic as handleRunWorkflow
     await handleRunWorkflow();
   };
 
@@ -273,15 +314,6 @@ export function Toolbar() {
         >
           <Play className="h-4 w-4 mr-2" />
           {isExecuting ? 'Running...' : 'Run All'}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRunSelected}
-          disabled={isExecuting}
-        >
-          <PlayCircle className="h-4 w-4 mr-2" />
-          Run Selected
         </Button>
 
         <Separator orientation="vertical" className="h-6 mx-2" />

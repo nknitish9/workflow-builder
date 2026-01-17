@@ -1,5 +1,6 @@
+// WorkflowExecutor.ts - Complete version with all fixes
+
 import { Node, Edge } from 'reactflow';
-import { trpc } from '@/lib/trpc/client';
 
 export interface ExecutionResult {
   nodeId: string;
@@ -20,7 +21,6 @@ export class WorkflowExecutor {
     this.edges = edges;
   }
 
-  // Build execution graph - identify dependencies
   private buildDependencyGraph(): Map<string, string[]> {
     const dependencies = new Map<string, string[]>();
     
@@ -34,24 +34,20 @@ export class WorkflowExecutor {
     return dependencies;
   }
 
-  // Get nodes that are ready to execute (all dependencies met)
   private getReadyNodes(
     dependencies: Map<string, string[]>,
     completed: Set<string>
   ): Node[] {
     return this.nodes.filter(node => {
-      // Skip if already completed or currently executing
       if (completed.has(node.id) || this.executing.has(node.id)) {
         return false;
       }
       
-      // Check if all dependencies are completed
       const deps = dependencies.get(node.id) || [];
       return deps.every(dep => completed.has(dep));
     });
   }
 
-  // Execute a single node
   private async executeNode(
     node: Node,
     onProgress?: (nodeId: string, status: 'running' | 'success' | 'failed') => void
@@ -62,6 +58,8 @@ export class WorkflowExecutor {
     if (onProgress) {
       onProgress(node.id, 'running');
     }
+    
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
       let output: any;
@@ -103,7 +101,7 @@ export class WorkflowExecutor {
       const duration = Date.now() - startTime;
       
       if (onProgress) {
-        onProgress(node.id, 'success');
+        setTimeout(() => onProgress(node.id, 'success'), 0);
       }
 
       return {
@@ -117,7 +115,7 @@ export class WorkflowExecutor {
       const duration = Date.now() - startTime;
       
       if (onProgress) {
-        onProgress(node.id, 'failed');
+        setTimeout(() => onProgress(node.id, 'failed'), 0);
       }
 
       return {
@@ -129,7 +127,7 @@ export class WorkflowExecutor {
     }
   }
 
-  // Execute LLM node
+  // FIXED: Execute LLM node with proper error handling
   private async executeLLMNode(node: Node): Promise<string> {
     const incomingEdges = this.edges.filter(e => e.target === node.id);
     
@@ -138,17 +136,23 @@ export class WorkflowExecutor {
     const images: Array<{ mimeType: string; data: string }> = [];
 
     for (const edge of incomingEdges) {
+      if (!this.results.has(edge.source)) {
+        continue;
+      }
+      
       const sourceOutput = this.results.get(edge.source);
       
-      if (edge.targetHandle === 'system_prompt') {
+      if (edge.targetHandle === 'system_prompt' || edge.targetHandle === 'systemPrompt') {
         systemPrompt = sourceOutput || '';
-      } else if (edge.targetHandle === 'user_message') {
+      } else if (edge.targetHandle === 'user_message' || edge.targetHandle === 'userMessage' || edge.targetHandle === 'prompt') {
         userMessage = sourceOutput || '';
-      } else if (edge.targetHandle === 'images') {
-        if (sourceOutput && typeof sourceOutput === 'string' && sourceOutput.startsWith('data:image')) {
-          const base64Data = sourceOutput.split(',')[1];
-          const mimeType = sourceOutput.match(/data:(.*?);/)?.[1] || 'image/jpeg';
-          images.push({ mimeType, data: base64Data });
+      } else if (edge.targetHandle === 'images' || edge.targetHandle === 'image') {
+        if (sourceOutput && typeof sourceOutput === 'string') {
+          if (sourceOutput.startsWith('data:image')) {
+            const base64Data = sourceOutput.split(',')[1];
+            const mimeType = sourceOutput.match(/data:(.*?);/)?.[1] || 'image/jpeg';
+            images.push({ mimeType, data: base64Data });
+          }
         }
       }
     }
@@ -157,7 +161,6 @@ export class WorkflowExecutor {
       throw new Error('User message is required for LLM node');
     }
 
-    // Call LLM API
     const response = await fetch('/api/trpc/llm.run', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -172,45 +175,90 @@ export class WorkflowExecutor {
     });
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || 'LLM execution failed');
     
-    return data.result.json.result;
+    if (!response.ok) {
+      throw new Error(data.error?.message || JSON.stringify(data) || 'LLM execution failed');
+    }
+    
+    // Handle different response formats
+    let result;
+    if (data.result?.json?.result) {
+      result = data.result.json.result;
+    } else if (data.result?.data?.json?.result) {
+      result = data.result.data.json.result;
+    } else if (data.result) {
+      result = data.result;
+    } else {
+      throw new Error('Unexpected LLM response format');
+    }
+    
+    return result;
   }
 
-  // Execute crop node (client-side)
   private async executeCropNode(node: Node): Promise<string> {
     const incomingEdges = this.edges.filter(e => e.target === node.id);
-    
-    // Get image input
-    const imageEdge = incomingEdges.find(e => e.targetHandle === 'image_url');
-    if (!imageEdge) throw new Error('No image connected to crop node');
-    
-    const imageData = this.results.get(imageEdge.source);
-    if (!imageData) throw new Error('No image data available');
 
-    // Get crop parameters
+    const imageEdge = incomingEdges.find(e => e.targetHandle === 'image_url' || e.targetHandle === 'image');
+    if (!imageEdge) throw new Error('No image connected to crop node');
+
+    // Get image from results OR from source node data (for "Run Selected")
+    let imageData = this.results.get(imageEdge.source);
+
+    if (!imageData) {
+      // Get from source node's stored data
+      const sourceNode = this.nodes.find(n => n.id === imageEdge.source);
+      imageData = sourceNode?.data?.imageData ||
+                  sourceNode?.data?.imageUrl ||
+                  sourceNode?.data?.result;
+
+      if (!imageData) {
+        throw new Error(`No image data available from node ${imageEdge.source}`);
+      }
+    }
+
     const getParam = (handle: string, defaultVal: number): number => {
       const edge = incomingEdges.find(e => e.targetHandle === handle);
       if (edge) {
         const value = this.results.get(edge.source);
         return parseFloat(value) || defaultVal;
       }
-      return node.data[handle.replace('_', '')] || defaultVal;
+      // Map handle name to data key (remove underscores)
+      const dataKey = handle.replace(/_/g, '') as keyof typeof node.data;
+      return (node.data[dataKey] as number) || defaultVal;
     };
 
-    const xPercent = getParam('x_percent', 0);
-    const yPercent = getParam('y_percent', 0);
-    const widthPercent = getParam('width_percent', 100);
-    const heightPercent = getParam('height_percent', 100);
+    let xPercent = getParam('x_percent', node.data.xPercent || 0);
+    let yPercent = getParam('y_percent', node.data.yPercent || 0);
+    const widthPercent = getParam('width_percent', node.data.widthPercent || 100);
+    const heightPercent = getParam('height_percent', node.data.heightPercent || 100);
 
-    // Perform crop using canvas
+    // If center crop is enabled, calculate centered position
+    if (node.data.centerCrop) {
+      xPercent = (100 - widthPercent) / 2;
+      yPercent = (100 - heightPercent) / 2;
+    }
+
+    // Validate percentages
+    if (widthPercent <= 0 || heightPercent <= 0) {
+      throw new Error('Width and height must be greater than 0%');
+    }
+
+    if (xPercent + widthPercent > 100 || yPercent + heightPercent > 100) {
+      throw new Error('Crop area exceeds image boundaries (x+width or y+height > 100%)');
+    }
+
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+
+      // Only set crossOrigin for external URLs, not data URLs
+      if (!imageData.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+      }
+
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: false });
           if (!ctx) throw new Error('Failed to get canvas context');
 
           const cropX = Math.floor((xPercent / 100) * img.width);
@@ -218,11 +266,19 @@ export class WorkflowExecutor {
           const cropWidth = Math.floor((widthPercent / 100) * img.width);
           const cropHeight = Math.floor((heightPercent / 100) * img.height);
 
+          if (cropWidth <= 0 || cropHeight <= 0) {
+            throw new Error(`Invalid crop dimensions: ${cropWidth}x${cropHeight}`);
+          }
+
+          if (cropX + cropWidth > img.width || cropY + cropHeight > img.height) {
+            throw new Error(`Crop area exceeds image boundaries`);
+          }
+
           canvas.width = cropWidth;
           canvas.height = cropHeight;
           ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-          
-          const result = canvas.toDataURL('image/jpeg', 0.95);
+
+          const result = canvas.toDataURL('image/png');
           canvas.remove();
           resolve(result);
         } catch (error) {
@@ -234,25 +290,31 @@ export class WorkflowExecutor {
     });
   }
 
-  // Execute extract frame node (client-side)
   private async executeExtractFrameNode(node: Node): Promise<string> {
     const incomingEdges = this.edges.filter(e => e.target === node.id);
     
-    // Get video input
-    const videoEdge = incomingEdges.find(e => e.targetHandle === 'video_url');
+    const videoEdge = incomingEdges.find(e => e.targetHandle === 'video_url' || e.targetHandle === 'video');
     if (!videoEdge) throw new Error('No video connected to extract frame node');
     
-    const videoData = this.results.get(videoEdge.source);
-    if (!videoData) throw new Error('No video data available');
+    // Get video from results OR from source node data (for "Run Selected")
+    let videoData = this.results.get(videoEdge.source);
+    
+    if (!videoData) {
+      // Get from source node's stored data
+      const sourceNode = this.nodes.find(n => n.id === videoEdge.source);
+      videoData = sourceNode?.data?.videoData || sourceNode?.data?.videoUrl || sourceNode?.data?.result;
+      
+      if (!videoData) {
+        throw new Error(`No video data available from node ${videoEdge.source}`);
+      }
+    }
 
-    // Get timestamp
     const timestampEdge = incomingEdges.find(e => e.targetHandle === 'timestamp');
     let timestamp = node.data.timestamp || '0';
     if (timestampEdge) {
       timestamp = this.results.get(timestampEdge.source) || '0';
     }
 
-    // Extract frame using video element
     return new Promise((resolve, reject) => {
       const video = document.createElement('video');
       video.crossOrigin = 'anonymous';
@@ -293,7 +355,6 @@ export class WorkflowExecutor {
     });
   }
 
-  // Execute workflow with parallel processing
   async execute(
     onProgress?: (nodeId: string, status: 'running' | 'success' | 'failed') => void
   ): Promise<Map<string, ExecutionResult>> {
@@ -302,11 +363,9 @@ export class WorkflowExecutor {
     const results = new Map<string, ExecutionResult>();
 
     while (completed.size < this.nodes.length) {
-      // Get all nodes ready to execute
       const readyNodes = this.getReadyNodes(dependencies, completed);
       
       if (readyNodes.length === 0) {
-        // No more nodes can execute - check for cycles or failed dependencies
         const remaining = this.nodes.filter(n => !completed.has(n.id));
         if (remaining.length > 0) {
           throw new Error(`Workflow stuck: ${remaining.length} nodes cannot execute. Check for cycles or failed dependencies.`);
@@ -314,11 +373,9 @@ export class WorkflowExecutor {
         break;
       }
 
-      // Execute all ready nodes in parallel
       const executions = readyNodes.map(node => this.executeNode(node, onProgress));
       const batchResults = await Promise.all(executions);
 
-      // Mark completed and store results
       batchResults.forEach(result => {
         completed.add(result.nodeId);
         results.set(result.nodeId, result);

@@ -41,12 +41,9 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       });
       runId = run.id;
 
-      console.log('Starting crop operation...');
-
       const edges = getEdges();
       const nodes = getNodes();
 
-      console.log('Looking for connected image...');
       // Find connected image
       const imageEdge = edges.find((e) => e.target === id && e.targetHandle === 'image_url');
       if (!imageEdge) {
@@ -54,43 +51,34 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       }
 
       const imageNode = nodes.find((n) => n.id === imageEdge.source);
-      const imageData = imageNode?.data?.imageData || imageNode?.data?.imageUrl;
-
-      console.log('Image node found:', imageNode?.type, 'Has data:', !!imageData);
+      const imageData = imageNode?.data?.imageData || imageNode?.data?.imageUrl || imageNode?.data?.result;
 
       if (!imageData) {
         throw new Error('Connected image node has no image.');
       }
 
-      // Get crop parameters (from connected nodes or manual input)
-      const getParamValue = (handle: string, defaultValue: number) => {
-        const edge = edges.find((e) => e.target === id && e.targetHandle === handle);
-        if (edge) {
-          const node = nodes.find((n) => n.id === edge.source);
-          return parseFloat(node?.data?.text || node?.data?.result || defaultValue);
-        }
-        return data[handle as keyof CropImageNodeData] as number || defaultValue;
-      };
+      // Get crop parameters from data
+      let xPercent = data.xPercent ?? 0;
+      let yPercent = data.yPercent ?? 0;
+      const widthPercent = data.widthPercent ?? 100;
+      const heightPercent = data.heightPercent ?? 100;
 
-      const xPercent = getParamValue('x_percent', 0);
-      const yPercent = getParamValue('y_percent', 0);
-      const widthPercent = getParamValue('width_percent', 100);
-      const heightPercent = getParamValue('height_percent', 100);
+      // If center crop is enabled, calculate centered position
+      if (data.centerCrop) {
+        xPercent = (100 - widthPercent) / 2;
+        yPercent = (100 - heightPercent) / 2;
+      }
 
-      console.log('Crop params:', { xPercent, yPercent, widthPercent, heightPercent });
-
-      // CLIENT-SIDE CROP USING CANVAS (avoids sending large data to server)
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (!imageData.startsWith('data:')) {
+        img.crossOrigin = 'anonymous';
+      }
       
-      console.log('Loading image...');
       await new Promise((resolve, reject) => {
         img.onload = () => {
-          console.log('Image loaded:', img.width, 'x', img.height);
           resolve(null);
         };
         img.onerror = (err) => {
-          console.error('Image load error:', err);
           reject(new Error('Failed to load image'));
         };
         img.src = imageData;
@@ -109,8 +97,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       const cropWidth = Math.floor((widthPercent / 100) * img.width);
       const cropHeight = Math.floor((heightPercent / 100) * img.height);
 
-      console.log('Calculated crop:', { cropX, cropY, cropWidth, cropHeight });
-
       // Validate crop dimensions
       if (cropWidth <= 0 || cropHeight <= 0) {
         throw new Error('Invalid crop dimensions. Width and height must be greater than 0.');
@@ -124,7 +110,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       canvas.width = cropWidth;
       canvas.height = cropHeight;
 
-      console.log('Drawing cropped image...');
       // Draw cropped portion
       ctx.drawImage(
         img,
@@ -134,7 +119,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
 
       // Convert to data URL
       const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.95);
-      console.log('Crop complete! Size:', croppedImageUrl.length, 'bytes');
 
       updateNodeData(id, { result: croppedImageUrl, isLoading: false });
       setNodeProcessing(id, false);
@@ -197,12 +181,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
     }
   };
 
-  // Check if inputs are connected
-  const hasConnection = (handle: string) => {
-    const edges = useReactFlow().getEdges();
-    return edges.some((e) => e.target === id && e.targetHandle === handle);
-  };
-
   return (
     <Card className={`w-80 bg-gradient-to-br from-white to-yellow-50/30 border border-yellow-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
       <div className="p-4 border-b rounded-t-lg border-yellow-100 bg-gradient-to-r from-yellow-50 to-yellow-100/50 flex items-center gap-3 relative">
@@ -221,6 +199,19 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       </div>
 
       <div className="p-4 space-y-3">
+        <div className="flex items-center space-x-2 mb-3">
+          <input
+            type="checkbox"
+            id={`center-crop-${id}`}
+            checked={data.centerCrop ?? false}
+            onChange={(e) => updateNodeData(id, { centerCrop: e.target.checked })}
+            className="nodrag h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+          />
+          <Label htmlFor={`center-crop-${id}`} className="text-xs font-medium cursor-pointer">
+            Center Crop
+          </Label>
+        </div>
+
         <div className="grid grid-cols-2 gap-2">
           <div>
             <Label className="text-xs">X %</Label>
@@ -228,9 +219,9 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               type="number"
               min="0"
               max="100"
-              value={data.xPercent}
+              value={data.xPercent ?? 0}
               onChange={(e) => updateNodeData(id, { xPercent: parseFloat(e.target.value) || 0 })}
-              disabled={hasConnection('x_percent')}
+              disabled={data.centerCrop}
               className="nodrag h-8"
             />
           </div>
@@ -240,9 +231,9 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               type="number"
               min="0"
               max="100"
-              value={data.yPercent}
+              value={data.yPercent ?? 0}
               onChange={(e) => updateNodeData(id, { yPercent: parseFloat(e.target.value) || 0 })}
-              disabled={hasConnection('y_percent')}
+              disabled={data.centerCrop}
               className="nodrag h-8"
             />
           </div>
@@ -252,9 +243,8 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               type="number"
               min="0"
               max="100"
-              value={data.widthPercent}
+              value={data.widthPercent ?? 100}
               onChange={(e) => updateNodeData(id, { widthPercent: parseFloat(e.target.value) || 100 })}
-              disabled={hasConnection('width_percent')}
               className="nodrag h-8"
             />
           </div>
@@ -264,9 +254,8 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               type="number"
               min="0"
               max="100"
-              value={data.heightPercent}
+              value={data.heightPercent ?? 100}
               onChange={(e) => updateNodeData(id, { heightPercent: parseFloat(e.target.value) || 100 })}
-              disabled={hasConnection('height_percent')}
               className="nodrag h-8"
             />
           </div>
@@ -306,12 +295,8 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         )}
       </div>
 
-      {/* Input handles */}
-      <Handle type="target" position={Position.Left} id="image_url" className="w-3 h-3 bg-green-500 border-2 border-white" style={{ top: '25%' }} />
-      <Handle type="target" position={Position.Left} id="x_percent" className="w-3 h-3 bg-blue-500 border-2 border-white" style={{ top: '40%' }} />
-      <Handle type="target" position={Position.Left} id="y_percent" className="w-3 h-3 bg-blue-500 border-2 border-white" style={{ top: '55%' }} />
-      <Handle type="target" position={Position.Left} id="width_percent" className="w-3 h-3 bg-blue-500 border-2 border-white" style={{ top: '70%' }} />
-      <Handle type="target" position={Position.Left} id="height_percent" className="w-3 h-3 bg-blue-500 border-2 border-white" style={{ top: '85%' }} />
+      {/* Input handle - only for image */}
+      <Handle type="target" position={Position.Left} id="image_url" className="w-3 h-3 bg-green-500 border-2 border-white" style={{ top: '50%' }} />
       
       {/* Output handle */}
       <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-yellow-500 border-2 border-white" />
