@@ -1,8 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-console.log("API KEY", process.env.NEXT_PUBLIC_GOOGLE_API_KEY);
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GOOGLE_API_KEY!);
-console.log("test", genAI);
 
 export interface GeminiMessage {
   role: 'user' | 'model';

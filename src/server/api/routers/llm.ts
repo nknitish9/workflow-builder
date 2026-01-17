@@ -18,7 +18,6 @@ export const llmRouter = createTRPCRouter({
 
         return { result };
       } catch (error) {
-        console.error('Gemini API error:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: error instanceof Error ? error.message : 'Failed to run LLM',

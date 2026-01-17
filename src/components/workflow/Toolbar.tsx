@@ -79,7 +79,6 @@ export function Toolbar() {
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 2000);
     } catch (error) {
-      alert('Failed to save workflow');
       console.error('Save error:', error);
     }
   };
@@ -118,7 +117,7 @@ export function Toolbar() {
           });
           setWorkflowName(workflow.name);
         } catch (error) {
-          alert('Failed to import workflow');
+          console.error('Import error:', error);
         }
       };
       reader.readAsText(file);
@@ -139,7 +138,6 @@ export function Toolbar() {
     const nodesToRun = selectedNodes.length > 0 ? selectedNodes : nodes;
     
     if (nodesToRun.length === 0) {
-      alert('No nodes to execute');
       return;
     }
 
@@ -261,7 +259,6 @@ export function Toolbar() {
                 error: result.error,
                 duration: result.duration,
               });
-              console.log(`✓ Saved node execution: ${nodeId} (${node?.type})`);
             } catch (nodeError) {
               console.error(`✗ Failed to save node ${nodeId}:`, nodeError);
             }
@@ -274,18 +271,11 @@ export function Toolbar() {
             status: hasFailures ? (successCount > 0 ? 'partial' : 'failed') : 'success',
             duration,
           });
-
-          console.log(`✓ Run completed: ${successCount} success, ${failCount} failed`);
         } catch (dbError) {
           console.error('Failed to save execution history:', dbError);
         }
       }
-
-      alert(`Workflow completed!\n✓ ${successCount} succeeded\n✗ ${failCount} failed\nTime: ${(duration / 1000).toFixed(1)}s`);
-
     } catch (error) {
-      console.error('Workflow execution error:', error);
-      
       // Update run status to failed if we have a runId
       if (runId) {
         try {
@@ -298,8 +288,6 @@ export function Toolbar() {
           console.error('Failed to update run status:', updateError);
         }
       }
-      
-      alert(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
       nodes.forEach(node => {

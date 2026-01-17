@@ -41,8 +41,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
       });
       runId = run.id;
 
-      console.log('Starting crop operation...');
-
       const edges = getEdges();
       const nodes = getNodes();
 
@@ -143,7 +141,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           
           return;
         } catch (canvasError) {
-          console.error('Canvas extraction failed:', canvasError);
           throw new Error('Failed to extract frame from video. Try with a smaller video file.');
         }
       }
@@ -152,7 +149,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
       // For now we only support data URLs
       throw new Error('Only local video files (data URLs) are supported');
     } catch (error) {
-      console.error('Extract frame error:', error);
       const duration = Date.now() - startTime;
 
       if (runId) {
@@ -253,7 +249,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
 
       {/* Input handles */}
       <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-white" style={{ top: '35%' }} />
-      <Handle type="target" position={Position.Left} id="timestamp" className="w-3 h-3 bg-blue-500 border-2 border-white" style={{ top: '65%' }} />
       
       {/* Output handle */}
       <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-pink-500 border-2 border-white" />

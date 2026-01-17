@@ -152,7 +152,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       // Cleanup
       canvas.remove();
     } catch (error) {
-      console.error('Crop error:', error);
       const duration = Date.now() - startTime;
 
       if (runId) {

@@ -140,7 +140,6 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
       updateNodeData(id, { result: result.result, isLoading: false });
       setNodeProcessing(id, false);
     } catch (error) {
-      console.error('LLM execution error:', error);
       const duration = Date.now() - startTime;
 
       if (runId) {

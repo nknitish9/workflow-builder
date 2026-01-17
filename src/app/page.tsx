@@ -39,13 +39,13 @@ function createSampleWorkflow() {
     {
       id: 'upload-img',
       type: 'image',
-      position: { x: 100, y: 100 },
+      position: { x: -70, y: -77 },
       data: { label: 'Product Photo' },
     },
     {
       id: 'crop-img',
       type: 'crop',
-      position: { x: 400, y: 100 },
+      position: { x: 324, y: -70 },
       data: {
         label: 'Crop Product',
         xPercent: 10,
@@ -57,7 +57,7 @@ function createSampleWorkflow() {
     {
       id: 'text-system',
       type: 'text',
-      position: { x: 100, y: 300 },
+      position: { x: -70, y: 190 },
       data: {
         label: 'System Prompt',
         text: 'You are a professional marketing copywriter. Generate compelling product descriptions.',
@@ -66,7 +66,7 @@ function createSampleWorkflow() {
     {
       id: 'text-product',
       type: 'text',
-      position: { x: 100, y: 500 },
+      position: { x: -70, y: 450 },
       data: {
         label: 'Product Details',
         text: 'Product: Wireless Bluetooth Headphones\nFeatures: Noise cancellation, 30-hour battery, foldable design.',
@@ -75,7 +75,7 @@ function createSampleWorkflow() {
     {
       id: 'llm-describe',
       type: 'llm',
-      position: { x: 750, y: 250 },
+      position: { x: 800, y: 225 },
       data: {
         label: 'Generate Description',
         model: 'gemini-2.5-flash',
@@ -85,13 +85,13 @@ function createSampleWorkflow() {
     {
       id: 'upload-video',
       type: 'video',
-      position: { x: 100, y: 700 },
+      position: { x: -70, y: 710 },
       data: { label: 'Product Demo Video' },
     },
     {
       id: 'extract-frame',
       type: 'extract',
-      position: { x: 400, y: 700 },
+      position: { x: 324, y: 700 },
       data: {
         label: 'Extract Frame',
         timestamp: '50%',
@@ -101,7 +101,7 @@ function createSampleWorkflow() {
     {
       id: 'text-final-system',
       type: 'text',
-      position: { x: 750, y: 600 },
+      position: { x: 800, y: 600 },
       data: {
         label: 'Social Media Prompt',
         text: 'Create a tweet-length marketing post based on the product description and images.',
@@ -110,7 +110,7 @@ function createSampleWorkflow() {
     {
       id: 'llm-final',
       type: 'llm',
-      position: { x: 1150, y: 450 },
+      position: { x: 1300, y: 450 },
       data: {
         label: 'Final Marketing Post',
         model: 'gemini-2.5-flash',

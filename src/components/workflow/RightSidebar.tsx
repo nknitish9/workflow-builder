@@ -59,7 +59,6 @@ export function RightSidebar() {
         await deleteRun.mutateAsync({ runId });
       } catch (error) {
         console.error('Failed to delete run:', error);
-        alert('Failed to delete run');
       }
     }
   };
@@ -69,7 +68,6 @@ export function RightSidebar() {
       await clearHistory.mutateAsync();
     } catch (error) {
       console.error('Failed to clear history:', error);
-      alert('Failed to clear history');
     }
   };
 

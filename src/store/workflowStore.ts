@@ -88,7 +88,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     };
 
     if (wouldCreateCycle(connection.target, connection.source)) {
-      console.warn('Connection would create a cycle');
       return;
     }
 
@@ -97,19 +96,16 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     // Image outputs can only connect to image inputs
     if (sourceNode.type === 'image' && targetHandle !== 'images' && targetHandle !== 'image_url') {
-      console.warn('Image nodes can only connect to image inputs');
       return;
     }
 
     // Video outputs can only connect to video inputs
     if (sourceNode.type === 'video' && targetHandle !== 'video_url') {
-      console.warn('Video nodes can only connect to video inputs');
       return;
     }
 
     // Text outputs cannot connect to image/video inputs
     if (sourceNode.type === 'text' && (targetHandle === 'images' || targetHandle === 'image_url' || targetHandle === 'video_url')) {
-      console.warn('Text nodes cannot connect to media inputs');
       return;
     }
 
