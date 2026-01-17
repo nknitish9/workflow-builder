@@ -1,5 +1,3 @@
-// WorkflowExecutor.ts - Complete version with all fixes
-
 import { Node, Edge } from 'reactflow';
 
 export interface ExecutionResult {

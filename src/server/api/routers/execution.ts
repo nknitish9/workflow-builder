@@ -12,7 +12,6 @@ export const executionRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Get user from Clerk
       const { userId: clerkUserId } = await auth();
       const clerkUser = await currentUser();
       
@@ -20,7 +19,6 @@ export const executionRouter = createTRPCRouter({
         throw new Error('User not authenticated');
       }
 
-      // Ensure user exists in database
       const user = await ctx.db.user.upsert({
         where: { clerkId: clerkUserId },
         update: {},
@@ -33,7 +31,7 @@ export const executionRouter = createTRPCRouter({
       const run = await ctx.db.workflowRun.create({
         data: {
           workflowId: input.workflowId,
-          userId: user.id, // Use database user ID, not Clerk ID
+          userId: user.id,
           status: 'running',
           runType: input.runType,
           nodeCount: input.nodeCount,
@@ -92,7 +90,6 @@ export const executionRouter = createTRPCRouter({
     }),
 
   listRuns: protectedProcedure.query(async ({ ctx }) => {
-    // Get user from Clerk
     const { userId: clerkUserId } = await auth();
     const clerkUser = await currentUser();
     
@@ -100,7 +97,6 @@ export const executionRouter = createTRPCRouter({
       return [];
     }
 
-    // Ensure user exists
     const user = await ctx.db.user.upsert({
       where: { clerkId: clerkUserId },
       update: {},
@@ -112,10 +108,10 @@ export const executionRouter = createTRPCRouter({
 
     const runs = await ctx.db.workflowRun.findMany({
       where: {
-        userId: user.id, // Use database user ID
+        userId: user.id,
       },
       orderBy: { startedAt: 'desc' },
-      take: 20,
+      take: 50, // Increased limit
       include: {
         nodeExecutions: {
           orderBy: { executedAt: 'asc' },
@@ -128,7 +124,6 @@ export const executionRouter = createTRPCRouter({
   getRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .query(async ({ ctx, input }) => {
-      // Get user from Clerk
       const { userId: clerkUserId } = await auth();
       const clerkUser = await currentUser();
       
@@ -136,7 +131,6 @@ export const executionRouter = createTRPCRouter({
         return null;
       }
 
-      // Get database user
       const user = await ctx.db.user.findUnique({
         where: { clerkId: clerkUserId },
       });
@@ -146,7 +140,7 @@ export const executionRouter = createTRPCRouter({
       const run = await ctx.db.workflowRun.findUnique({
         where: { 
           id: input.runId,
-          userId: user.id, // Security: only get user's own runs
+          userId: user.id,
         },
         include: {
           nodeExecutions: {
@@ -155,5 +149,61 @@ export const executionRouter = createTRPCRouter({
         },
       });
       return run;
+    }),
+
+  // NEW: Delete a single run
+  deleteRun: protectedProcedure
+    .input(z.object({ runId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const { userId: clerkUserId } = await auth();
+      const clerkUser = await currentUser();
+      
+      if (!clerkUserId || !clerkUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const user = await ctx.db.user.findUnique({
+        where: { clerkId: clerkUserId },
+      });
+
+      if (!user) throw new Error('User not found');
+
+      // Verify ownership before deleting
+      const run = await ctx.db.workflowRun.findUnique({
+        where: { id: input.runId },
+      });
+
+      if (!run || run.userId !== user.id) {
+        throw new Error('Run not found or unauthorized');
+      }
+
+      await ctx.db.workflowRun.delete({
+        where: { id: input.runId },
+      });
+
+      return { success: true };
+    }),
+
+  // NEW: Clear all history for current user
+  clearHistory: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const { userId: clerkUserId } = await auth();
+      const clerkUser = await currentUser();
+      
+      if (!clerkUserId || !clerkUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const user = await ctx.db.user.findUnique({
+        where: { clerkId: clerkUserId },
+      });
+
+      if (!user) throw new Error('User not found');
+
+      const result = await ctx.db.workflowRun.deleteMany({
+        where: { userId: user.id },
+      });
+
+      return { deletedCount: result.count };
     }),
 });

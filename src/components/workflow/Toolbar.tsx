@@ -16,8 +16,6 @@ import {
   Trash2,
   Check,
   Play,
-  PlayCircle,
-  Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,11 +24,9 @@ function stripBinaryData(nodes: any[]) {
   return nodes.map(node => {
     const cleanNode = { ...node };
     
-    // Remove large binary data fields
     if (cleanNode.data) {
       const cleanData = { ...cleanNode.data };
       
-      // Remove image/video data URLs (keep metadata)
       if (cleanData.imageData && typeof cleanData.imageData === 'string' && cleanData.imageData.startsWith('data:')) {
         delete cleanData.imageData;
         cleanData.hasImageData = true;
@@ -41,13 +37,11 @@ function stripBinaryData(nodes: any[]) {
         cleanData.hasVideoData = true;
       }
 
-      // Remove result images from crop/extract nodes
       if (cleanData.result && typeof cleanData.result === 'string' && cleanData.result.startsWith('data:')) {
         delete cleanData.result;
         cleanData.hasResult = true;
       }
       
-      // Remove large image arrays from LLM nodes
       if (cleanData.images && Array.isArray(cleanData.images)) {
         delete cleanData.images;
         cleanData.imageCount = cleanData.images.length;
@@ -147,21 +141,32 @@ export function Toolbar() {
       alert('No nodes to execute');
       return;
     }
+
     setIsExecuting(true);
     const startTime = Date.now();
 
+    // Create run record FIRST
+    let runId: string | null = null;
     try {
-      // Get edges for selected nodes only
+      const run = await createRun.mutateAsync({
+        runType: selectedNodes.length > 0 ? 'partial' : 'full',
+        nodeCount: nodesToRun.length,
+      });
+      runId = run.id;
+    } catch (dbError) {
+      console.warn('Failed to create run record:', dbError);
+    }
+
+    try {
       const nodeIds = new Set(nodesToRun.map(n => n.id));
       const relevantEdges = edges.filter(e => 
         nodeIds.has(e.source) && nodeIds.has(e.target)
       );
 
-      // CRITICAL FIX: Pass ALL nodes to executor (for data access), but only execute selected ones
-      const executor = new WorkflowExecutor(
-        nodesToRun,      // Nodes to execute
-        relevantEdges    // Edges between them
-      );
+      const executor = new WorkflowExecutor(nodesToRun, relevantEdges);
+
+      // Track all node executions
+      const nodeExecutionPromises: Promise<any>[] = [];
 
       // Execute with progress tracking
       const results = await executor.execute((nodeId, status) => {
@@ -219,58 +224,80 @@ export function Toolbar() {
       const successCount = Array.from(results.values()).filter(r => r.status === 'success').length;
       const failCount = Array.from(results.values()).filter(r => r.status === 'failed').length;
 
-      alert(`Workflow completed!\n✓ ${successCount} succeeded\n✗ ${failCount} failed\nTime: ${(duration / 1000).toFixed(1)}s`);
-
-      // Try to save history
-      try {
-        const run = await createRun.mutateAsync({
-          runType: selectedNodes.length > 0 ? 'partial' : 'full',
-          nodeCount: nodesToRun.length,
-        });
-
-        for (const [nodeId, result] of results) {
-          const node = nodes.find(n => n.id === nodeId);
-          
-          let outputForDb;
-          if (result.output) {
-            if (typeof result.output === 'string' && result.output.startsWith('data:')) {
-              outputForDb = { 
-                type: 'media',
-                format: result.output.substring(0, 30),
-                size: result.output.length 
-              };
-            } else if (typeof result.output === 'string' && result.output.length > 1000) {
-              outputForDb = { 
-                result: result.output.substring(0, 1000) + '... (truncated)'
-              };
-            } else {
-              outputForDb = { result: String(result.output).substring(0, 1000) };
+      // Save ALL node executions to database
+      if (runId) {
+        try {
+          // Save each node execution sequentially to ensure all are saved
+          for (const [nodeId, result] of results) {
+            const node = nodes.find(n => n.id === nodeId);
+            
+            let outputForDb;
+            if (result.output) {
+              if (typeof result.output === 'string' && result.output.startsWith('data:')) {
+                outputForDb = { 
+                  type: 'media',
+                  format: result.output.substring(0, 30),
+                  size: result.output.length 
+                };
+              } else if (typeof result.output === 'string' && result.output.length > 1000) {
+                outputForDb = { 
+                  result: result.output.substring(0, 1000) + '... (truncated)'
+                };
+              } else {
+                outputForDb = { result: String(result.output).substring(0, 1000) };
+              }
+            }
+            
+            // Save each node execution one by one
+            try {
+              await addNodeExecution.mutateAsync({
+                runId: runId,
+                nodeId,
+                nodeType: node?.type || 'unknown',
+                status: result.status,
+                inputs: node?.data || {},
+                outputs: outputForDb,
+                error: result.error,
+                duration: result.duration,
+              });
+              console.log(`✓ Saved node execution: ${nodeId} (${node?.type})`);
+            } catch (nodeError) {
+              console.error(`✗ Failed to save node ${nodeId}:`, nodeError);
             }
           }
-          
-          await addNodeExecution.mutateAsync({
-            runId: run.id,
-            nodeId,
-            nodeType: node?.type || 'unknown',
-            status: result.status,
-            inputs: node?.data || {},
-            outputs: outputForDb,
-            error: result.error,
-            duration: result.duration,
-          });
-        }
 
-        const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
-        await updateRun.mutateAsync({
-          runId: run.id,
-          status: hasFailures ? 'partial' : 'success',
-          duration,
-        });
-      } catch (dbError) {
-        console.warn('Failed to save history (database unavailable):', dbError);
+          // Update run status to final state
+          const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
+          await updateRun.mutateAsync({
+            runId: runId,
+            status: hasFailures ? (successCount > 0 ? 'partial' : 'failed') : 'success',
+            duration,
+          });
+
+          console.log(`✓ Run completed: ${successCount} success, ${failCount} failed`);
+        } catch (dbError) {
+          console.error('Failed to save execution history:', dbError);
+        }
       }
+
+      alert(`Workflow completed!\n✓ ${successCount} succeeded\n✗ ${failCount} failed\nTime: ${(duration / 1000).toFixed(1)}s`);
+
     } catch (error) {
       console.error('Workflow execution error:', error);
+      
+      // Update run status to failed if we have a runId
+      if (runId) {
+        try {
+          await updateRun.mutateAsync({
+            runId: runId,
+            status: 'failed',
+            duration: Date.now() - startTime,
+          });
+        } catch (updateError) {
+          console.error('Failed to update run status:', updateError);
+        }
+      }
+      
       alert(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsExecuting(false);
@@ -279,17 +306,6 @@ export function Toolbar() {
         updateNodeData(node.id, { isProcessing: false, isLoading: false });
       });
     }
-  };
-
-  const handleRunSelected = async () => {
-    const selectedNodes = nodes.filter(n => n.selected);
-    
-    if (selectedNodes.length === 0) {
-      alert('No nodes selected. Select one or more nodes to run.');
-      return;
-    }
-    
-    await handleRunWorkflow();
   };
 
   return (
