@@ -325,7 +325,7 @@ export function RightSidebar() {
         </div>
       </div>
 
-      {/* Clear History Confirmation Dialog */}
+      {/* Clear History*/}
       <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -57,7 +57,7 @@ export const cropImageTask = task({
       // Read cropped image
       const croppedBuffer = await readFile(outputPath);
       
-      // Upload to Transloadit (or your storage)
+      // Upload to Transloadit
       // For now, return as base64
       const base64 = croppedBuffer.toString('base64');
       const dataUrl = `data:image/jpeg;base64,${base64}`;

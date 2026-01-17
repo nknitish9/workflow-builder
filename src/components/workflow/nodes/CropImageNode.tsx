@@ -113,8 +113,8 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       // Draw cropped portion
       ctx.drawImage(
         img,
-        cropX, cropY, cropWidth, cropHeight, // Source rectangle
-        0, 0, cropWidth, cropHeight // Destination rectangle
+        cropX, cropY, cropWidth, cropHeight,
+        0, 0, cropWidth, cropHeight
       );
 
       // Convert to data URL
@@ -294,7 +294,7 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         )}
       </div>
 
-      {/* Input handle - only for image */}
+      {/* Input handle */}
       <Handle type="target" position={Position.Left} id="image_url" className="w-3 h-3 bg-green-500 border-2 border-white" style={{ top: '50%' }} />
       
       {/* Output handle */}

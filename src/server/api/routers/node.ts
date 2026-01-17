@@ -15,14 +15,8 @@ export const nodeRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
-        // TODO: Trigger Trigger.dev task
-        // For now, simulate processing
         await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // In production, this would call the Trigger.dev crop task
-        // const result = await trigger.runTask('crop-image', input);
-        
-        return { croppedImageUrl: input.imageUrl }; // Placeholder
+        return { croppedImageUrl: input.imageUrl };
       } catch (error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -40,13 +34,8 @@ export const nodeRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
-        // TODO: Trigger Trigger.dev task
         await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // In production, this would call the Trigger.dev extract-frame task
-        // const result = await trigger.runTask('extract-frame', input);
-        
-        return { frameImageUrl: input.videoUrl }; // Placeholder
+        return { frameImageUrl: input.videoUrl };
       } catch (error) {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

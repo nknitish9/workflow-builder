@@ -50,7 +50,7 @@ export const extractFrameTask = task({
       // Read extracted frame
       const frameBuffer = await readFile(outputPath);
       
-      // Upload to Transloadit (or your storage)
+      // Upload to Transloadit
       // For now, return as base64
       const base64 = frameBuffer.toString('base64');
       const dataUrl = `data:image/jpeg;base64,${base64}`;

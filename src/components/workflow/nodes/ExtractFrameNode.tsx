@@ -26,8 +26,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
   const handleRun = async () => {
     updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
     setNodeProcessing(id, true);
-    
-    // Force UI update before heavy processing
+
     await new Promise(resolve => setTimeout(resolve, 100));
 
     const startTime = Date.now();
@@ -66,7 +65,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         timestamp = timestampNode?.data?.text || timestampNode?.data?.result || '0';
       }
 
-      // IMPORTANT: Convert data URL to blob URL for large files
+      // Convert data URL to blob URL for large files
       let processableVideoUrl = videoData;
       
       if (videoData.startsWith('data:')) {
@@ -108,7 +107,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
 
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
-          // Convert to data URL (much smaller than video)
+          // Convert to data URL
           const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
           
           updateNodeData(id, { result: frameDataUrl, isLoading: false });
@@ -144,9 +143,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           throw new Error('Failed to extract frame from video. Try with a smaller video file.');
         }
       }
-
-      // If it's already a URL (not data URL), would call the API here
-      // For now we only support data URLs
+      
       throw new Error('Only local video files (data URLs) are supported');
     } catch (error) {
       const duration = Date.now() - startTime;

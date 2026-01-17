@@ -29,7 +29,7 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
     updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
     setNodeProcessing(id, true);
     
-    // Force UI update before heavy processing
+    // Force UI update before processing
     await new Promise(resolve => setTimeout(resolve, 100));
 
     const startTime = Date.now();

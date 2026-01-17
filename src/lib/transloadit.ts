@@ -1,4 +1,4 @@
-import Transloadit from 'transloadit';
+import { Transloadit } from 'transloadit';
 
 if (!process.env.NEXT_PUBLIC_TRANSLOADIT_KEY) {
   throw new Error('Missing NEXT_PUBLIC_TRANSLOADIT_KEY');
@@ -39,7 +39,7 @@ export async function uploadToTransloadit(
     files: {
       file: file as any, // Type assertion for Transloadit library compatibility
     },
-    params,
+    params: params as any,
   });
 
   // Safely access results with proper null checks
@@ -50,7 +50,6 @@ export async function uploadToTransloadit(
   return assembly.results.exported[0].ssl_url || assembly.results.exported[0].url || '';
 }
 
-// Helper to get Transloadit signature for client-side uploads
 export function getTransloaditSignature() {
   const params = {
     auth: {

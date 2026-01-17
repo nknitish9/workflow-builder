@@ -111,7 +111,7 @@ export const executionRouter = createTRPCRouter({
         userId: user.id,
       },
       orderBy: { startedAt: 'desc' },
-      take: 50, // Increased limit
+      take: 50,
       include: {
         nodeExecutions: {
           orderBy: { executedAt: 'asc' },
@@ -151,7 +151,7 @@ export const executionRouter = createTRPCRouter({
       return run;
     }),
 
-  // NEW: Delete a single run
+  // Delete a single run
   deleteRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -184,7 +184,7 @@ export const executionRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // NEW: Clear all history for current user
+  // Clear all history for current user
   clearHistory: protectedProcedure
     .mutation(async ({ ctx }) => {
       const { userId: clerkUserId } = await auth();

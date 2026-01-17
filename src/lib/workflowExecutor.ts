@@ -125,7 +125,6 @@ export class WorkflowExecutor {
     }
   }
 
-  // FIXED: Execute LLM node with proper error handling
   private async executeLLMNode(node: Node): Promise<string> {
     const incomingEdges = this.edges.filter(e => e.target === node.id);
     
@@ -199,15 +198,13 @@ export class WorkflowExecutor {
     const imageEdge = incomingEdges.find(e => e.targetHandle === 'image_url' || e.targetHandle === 'image');
     if (!imageEdge) throw new Error('No image connected to crop node');
 
-    // Get image from results OR from source node data (for "Run Selected")
+    // Get image from results OR from source node data
     let imageData = this.results.get(imageEdge.source);
 
     if (!imageData) {
       // Get from source node's stored data
       const sourceNode = this.nodes.find(n => n.id === imageEdge.source);
-      imageData = sourceNode?.data?.imageData ||
-                  sourceNode?.data?.imageUrl ||
-                  sourceNode?.data?.result;
+      imageData = sourceNode?.data?.imageData || sourceNode?.data?.imageUrl || sourceNode?.data?.result;
 
       if (!imageData) {
         throw new Error(`No image data available from node ${imageEdge.source}`);
@@ -220,7 +217,7 @@ export class WorkflowExecutor {
         const value = this.results.get(edge.source);
         return parseFloat(value) || defaultVal;
       }
-      // Map handle name to data key (remove underscores)
+      // Map handle name to data key
       const dataKey = handle.replace(/_/g, '') as keyof typeof node.data;
       return (node.data[dataKey] as number) || defaultVal;
     };
@@ -294,7 +291,7 @@ export class WorkflowExecutor {
     const videoEdge = incomingEdges.find(e => e.targetHandle === 'video_url' || e.targetHandle === 'video');
     if (!videoEdge) throw new Error('No video connected to extract frame node');
     
-    // Get video from results OR from source node data (for "Run Selected")
+    // Get video from results OR from source node data
     let videoData = this.results.get(videoEdge.source);
     
     if (!videoData) {
