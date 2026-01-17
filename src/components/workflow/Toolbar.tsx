@@ -7,6 +7,7 @@ import { useWorkflowStore } from '@/store/workflowStore';
 import { trpc } from '@/lib/trpc/client';
 import { WorkflowsDialog } from './WorkflowsDialog';
 import { WorkflowExecutor } from '@/lib/workflowExecutor';
+import { UserButton } from '@clerk/nextjs';
 import {
   Save,
   Download,
@@ -388,6 +389,18 @@ export function Toolbar() {
         <Button variant="ghost" size="sm" onClick={handleClear}>
           <Trash2 className="h-4 w-4" />
         </Button>
+
+        <Separator orientation="vertical" className="h-6 mx-2" />
+
+        {/* User Profile & Logout - Using Clerk's UserButton */}
+        <UserButton 
+          afterSignOutUrl="/sign-in"
+          appearance={{
+            elements: {
+              avatarBox: "h-8 w-8"
+            }
+          }}
+        />
       </div>
     </div>
   );
