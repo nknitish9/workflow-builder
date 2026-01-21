@@ -65,86 +65,126 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         timestamp = timestampNode?.data?.text || timestampNode?.data?.result || '0';
       }
 
-      // Convert data URL to blob URL for large files
+      // Handle both data URLs and remote URLs
       let processableVideoUrl = videoData;
-      
-      if (videoData.startsWith('data:')) {
-        try {
-          // Extract video from browser using canvas approach
-          const video = document.createElement('video');
-          video.src = videoData;
-          video.crossOrigin = 'anonymous';
-          
-          await new Promise((resolve, reject) => {
-            video.onloadedmetadata = resolve;
-            video.onerror = reject;
+
+      try {
+        // For remote URLs, we need to download and convert to blob URL
+        if (!videoData.startsWith('data:')) {
+          const response = await fetch(videoData, {
+            mode: 'cors',
+            credentials: 'omit'
           });
 
-          // Parse timestamp
-          let seekTime = 0;
-          if (typeof timestamp === 'string' && timestamp.includes('%')) {
-            const percent = parseFloat(timestamp.replace('%', ''));
-            seekTime = (percent / 100) * video.duration;
-          } else {
-            seekTime = parseFloat(timestamp.toString());
+          if (!response.ok) {
+            throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
           }
 
-          video.currentTime = seekTime;
-          
-          await new Promise((resolve) => {
-            video.onseeked = resolve;
-          });
-
-          // Extract frame using canvas
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            throw new Error('Failed to get canvas context');
-          }
-
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Convert to data URL
-          const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-          
-          updateNodeData(id, { result: frameDataUrl, isLoading: false });
-          setNodeProcessing(id, false);
-
-          // Log successful execution
-          const duration = Date.now() - startTime;
-          await addNodeExecution.mutateAsync({
-            runId,
-            nodeId: id,
-            nodeType: 'extract',
-            status: 'success',
-            inputs: { timestamp },
-            outputs: {
-              result: 'Frame extracted successfully',
-              size: frameDataUrl.length,
-            },
-            duration,
-          });
-
-          await updateRun.mutateAsync({
-            runId,
-            status: 'success',
-            duration,
-          });
-          
-          // Cleanup
-          video.remove();
-          canvas.remove();
-          
-          return;
-        } catch (canvasError) {
-          throw new Error('Failed to extract frame from video. Try with a smaller video file.');
+          const blob = await response.blob();
+          processableVideoUrl = URL.createObjectURL(blob);
         }
+
+        // Extract video from browser using canvas approach
+        const video = document.createElement('video');
+        video.src = processableVideoUrl;
+        video.crossOrigin = 'anonymous';
+        video.preload = 'metadata';
+
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Video loading timeout'));
+          }, 60000); // 1 minute timeout
+
+          video.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            resolve(null);
+          };
+
+          video.onerror = (e) => {
+            clearTimeout(timeout);
+            reject(new Error('Failed to load video metadata'));
+          };
+        });
+
+        // Parse timestamp
+        let seekTime = 0;
+        if (typeof timestamp === 'string' && timestamp.includes('%')) {
+          const percent = parseFloat(timestamp.replace('%', ''));
+          seekTime = (percent / 100) * video.duration;
+        } else {
+          seekTime = parseFloat(timestamp.toString());
+        }
+        // Ensure seek time is within bounds
+        seekTime = Math.max(0, Math.min(seekTime, video.duration - 0.1));
+
+        video.currentTime = seekTime;
+
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Seek timeout'));
+          }, 10000);
+
+          video.onseeked = () => {
+            clearTimeout(timeout);
+            resolve(null);
+          };
+
+          video.onerror = (e) => {
+            clearTimeout(timeout);
+            reject(new Error('Seek failed'));
+          };
+        });
+
+        // Extract frame using canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          throw new Error('Failed to get canvas context');
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert to data URL
+        const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+        updateNodeData(id, { result: frameDataUrl, isLoading: false });
+        setNodeProcessing(id, false);
+
+        // Log successful execution
+        const duration = Date.now() - startTime;
+        await addNodeExecution.mutateAsync({
+          runId,
+          nodeId: id,
+          nodeType: 'extract',
+          status: 'success',
+          inputs: { timestamp } as any,
+          outputs: {
+            result: 'Frame extracted successfully',
+            size: frameDataUrl.length,
+          },
+          duration,
+        });
+
+        await updateRun.mutateAsync({
+          runId,
+          status: 'success',
+          duration,
+        });
+
+        // Cleanup
+        video.remove();
+        canvas.remove();
+        if (processableVideoUrl !== videoData) {
+          URL.revokeObjectURL(processableVideoUrl);
+        }
+
+        return;
+      } catch (canvasError) {
+        throw new Error(`Failed to extract frame from video: ${canvasError instanceof Error ? canvasError.message : 'Unknown error'}. Try with a smaller video file or different format.`);
       }
-      
-      throw new Error('Only local video files (data URLs) are supported');
     } catch (error) {
       const duration = Date.now() - startTime;
 

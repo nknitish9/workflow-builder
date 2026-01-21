@@ -1,35 +1,78 @@
 'use client';
 
-import { memo, useRef } from 'react';
+import { memo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { ImageNodeData } from '@/types/nodes';
-import { Image as ImageIcon, Upload, X, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Upload, X, Trash2, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      updateNodeData(id, {
-        imageData: base64,
-        fileName: file.name,
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setUploadError('Invalid file type. Please upload JPG, PNG, WEBP, or GIF.');
+      return;
+    }
+
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError('File too large. Maximum size is 50MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', 'image');
+
+      // Upload via API route
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
       });
-    };
-    reader.readAsDataURL(file);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
+      }
+
+      const result = await response.json();
+
+      updateNodeData(id, {
+        imageUrl: result.url,
+        imageData: result.thumbnailUrl || result.url, // Use thumbnail for preview
+        fileName: result.fileName,
+      });
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleClearImage = () => {
-    updateNodeData(id, { imageData: undefined, fileName: undefined });
+    updateNodeData(id, {
+      imageData: undefined,
+      imageUrl: undefined,
+      fileName: undefined,
+    });
+    setUploadError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -51,31 +94,45 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
+
       <div className="p-4 space-y-3">
-        {!data.imageData ? (
+        {!data.imageData && !data.imageUrl ? (
           <div className="border-2 border-dashed border-green-300/60 rounded-xl p-8 text-center bg-gradient-to-br from-green-50/50 to-green-100/30 hover:from-green-100/50 hover:to-green-50/50 transition-all duration-300">
             <Button
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
               className="nodrag bg-white/80 hover:bg-white border-green-300 hover:border-green-400 transition-all duration-200 shadow-sm"
             >
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Image
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Image
+                </>
+              )}
             </Button>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
               onChange={handleFileChange}
               className="hidden"
+              disabled={isUploading}
             />
-            <p className="text-xs text-slate-500 mt-3 font-medium">JPG, PNG, GIF</p>
+            <p className="text-xs text-slate-500 mt-3 font-medium">
+              JPG, PNG, WEBP, GIF (max 50MB)
+            </p>
           </div>
         ) : (
           <div className="relative group/img">
             <img
-              src={data.imageData}
+              src={data.imageData || data.imageUrl}
               alt={data.fileName || 'Uploaded'}
               className="w-full h-40 object-cover rounded-lg border border-green-200 shadow-sm"
             />
@@ -84,13 +141,23 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
               size="icon"
               className="absolute top-2 right-2 h-7 w-7 nodrag opacity-0 group-hover/img:opacity-100 transition-all duration-200 shadow-lg hover:scale-110"
               onClick={handleClearImage}
+              disabled={isUploading}
             >
               <X className="h-4 w-4" />
             </Button>
-            <p className="text-xs text-slate-600 mt-2 truncate font-medium">{data.fileName}</p>
+            <p className="text-xs text-slate-600 mt-2 truncate font-medium">
+              {data.fileName}
+            </p>
           </div>
         )}
+
+        {uploadError && (
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs">{uploadError}</AlertDescription>
+          </Alert>
+        )}
       </div>
+
       <Handle
         type="source"
         position={Position.Right}

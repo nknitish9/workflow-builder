@@ -13,12 +13,14 @@ export interface ImageNodeData extends BaseNodeData {
   imageUrl?: string;
   imageData?: string;
   fileName?: string;
+  thumbnailUrl?: string;
 }
 
 export interface VideoNodeData extends BaseNodeData {
   videoUrl?: string;
   videoData?: string;
   fileName?: string;
+  thumbnailUrl?: string;
 }
 
 export interface LLMNodeData extends BaseNodeData {

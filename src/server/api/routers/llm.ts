@@ -8,7 +8,6 @@ export const llmRouter = createTRPCRouter({
     .input(runLLMSchema)
     .mutation(async ({ input }) => {
       try {
-        debugger;
         const result = await runGemini({
           model: input.model,
           systemPrompt: input.systemPrompt,
