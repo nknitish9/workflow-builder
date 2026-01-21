@@ -20,14 +20,12 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
     if (!validTypes.includes(file.type)) {
       setUploadError('Invalid file type. Please upload JPG, PNG, WEBP, or GIF.');
       return;
     }
 
-    // Validate file size (max 50MB)
     if (file.size > 50 * 1024 * 1024) {
       setUploadError('File too large. Maximum size is 50MB.');
       return;
@@ -41,7 +39,6 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
       formData.append('file', file);
       formData.append('type', 'image');
 
-      // Upload via API route
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -56,7 +53,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
 
       updateNodeData(id, {
         imageUrl: result.url,
-        imageData: result.thumbnailUrl || result.url, // Use thumbnail for preview
+        imageData: result.thumbnailUrl || result.url,
         fileName: result.fileName,
       });
     } catch (error) {
@@ -79,31 +76,31 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
   };
 
   return (
-    <Card className="w-72 bg-gradient-to-br from-white to-green-50/30 border border-green-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b rounded-t-lg border-green-100 bg-gradient-to-r from-green-50 to-green-100/50 flex items-center gap-3 relative">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center shadow-sm">
-          <ImageIcon className="h-4 w-4 text-white" />
+    <Card className="w-[420px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
+      <div className="p-5 border-b border-[#3a3a3a] flex items-center gap-3 relative">
+        <div className="flex items-center justify-center">
+          <ImageIcon className="h-4 w-4 text-zinc-400" />
         </div>
-        <span className="font-bold text-sm text-slate-800">{data.label}</span>
+        <span className="font-medium text-base text-white tracking-wide">{data.label}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-red-100 hover:text-red-600"
+          className="absolute top-3 right-3 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-zinc-800 hover:text-red-400"
           onClick={() => deleteNode(id)}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="p-5 space-y-3">
         {!data.imageData && !data.imageUrl ? (
-          <div className="border-2 border-dashed border-green-300/60 rounded-xl p-8 text-center bg-gradient-to-br from-green-50/50 to-green-100/30 hover:from-green-100/50 hover:to-green-50/50 transition-all duration-300">
+          <div className="border-2 border-dashed border-[#3a3a3a] rounded-xl p-12 text-center bg-[#1a1a1a] hover:border-[#4a4a4a] transition-all duration-300">
             <Button
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="nodrag bg-white/80 hover:bg-white border-green-300 hover:border-green-400 transition-all duration-200 shadow-sm"
+              className="nodrag bg-[#2a2a2a] hover:bg-[#3a3a3a] border-[#3a3a3a] hover:border-[#4a4a4a] text-white transition-all duration-200 shadow-sm"
             >
               {isUploading ? (
                 <>
@@ -125,7 +122,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
               className="hidden"
               disabled={isUploading}
             />
-            <p className="text-xs text-slate-500 mt-3 font-medium">
+            <p className="text-xs text-zinc-500 mt-3 font-normal">
               JPG, PNG, WEBP, GIF (max 50MB)
             </p>
           </div>
@@ -134,7 +131,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
             <img
               src={data.imageData || data.imageUrl}
               alt={data.fileName || 'Uploaded'}
-              className="w-full h-40 object-cover rounded-lg border border-green-200 shadow-sm"
+              className="w-full h-48 object-cover rounded-xl border border-[#3a3a3a] shadow-sm"
             />
             <Button
               variant="destructive"
@@ -145,15 +142,15 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
             >
               <X className="h-4 w-4" />
             </Button>
-            <p className="text-xs text-slate-600 mt-2 truncate font-medium">
+            <p className="text-xs text-zinc-400 mt-2 truncate font-normal">
               {data.fileName}
             </p>
           </div>
         )}
 
         {uploadError && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs">{uploadError}</AlertDescription>
+          <Alert variant="destructive" className="bg-red-950 border-red-900">
+            <AlertDescription className="text-xs text-red-400">{uploadError}</AlertDescription>
           </Alert>
         )}
       </div>
@@ -162,7 +159,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
         type="source"
         position={Position.Right}
         id="output"
-        className="w-4 h-4 bg-gradient-to-r from-green-400 to-green-600 border-2 border-white shadow-sm"
+        className="w-4 h-4 bg-green-500 border-2 border-[#2a2a2a] rounded-full"
       />
     </Card>
   );

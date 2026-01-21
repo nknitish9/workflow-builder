@@ -97,7 +97,7 @@ function FlowCanvas() {
   return (
     <div
       ref={reactFlowWrapper}
-      className="flex-1 h-full bg-gradient-to-br from-slate-50/50 to-blue-50/30"
+      className="flex-1 h-full bg-[#0a0a0a]"
     >
       <ReactFlow
         nodes={nodes}
@@ -122,8 +122,8 @@ function FlowCanvas() {
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1.5}
-          color="gray"
-          className="opacity-40"
+          color="#FFFFFF"
+          className="opacity-20"
         />
 
         <MiniMap

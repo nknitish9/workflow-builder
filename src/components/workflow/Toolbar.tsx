@@ -144,7 +144,6 @@ export function Toolbar() {
     setIsExecuting(true);
     const startTime = Date.now();
 
-    // Create run record FIRST
     let runId: string | null = null;
     try {
       const run = await createRun.mutateAsync({
@@ -164,10 +163,6 @@ export function Toolbar() {
 
       const executor = new WorkflowExecutor(nodesToRun, relevantEdges);
 
-      // Track all node executions
-      const nodeExecutionPromises: Promise<any>[] = [];
-
-      // Execute with progress tracking
       const results = await executor.execute((nodeId, status) => {
         if (status === 'running') {
           setNodeProcessing(nodeId, true);
@@ -200,7 +195,6 @@ export function Toolbar() {
         }
       });
 
-      // Update all nodes with final results
       results.forEach((result, nodeId) => {
         if (result.status === 'success' && result.output) {
           updateNodeData(nodeId, { 
@@ -221,12 +215,9 @@ export function Toolbar() {
 
       const duration = Date.now() - startTime;
       const successCount = Array.from(results.values()).filter(r => r.status === 'success').length;
-      const failCount = Array.from(results.values()).filter(r => r.status === 'failed').length;
 
-      // Save ALL node executions to database
       if (runId) {
         try {
-          // Save each node execution sequentially to ensure all are saved
           for (const [nodeId, result] of results) {
             const node = nodes.find(n => n.id === nodeId);
             
@@ -247,7 +238,6 @@ export function Toolbar() {
               }
             }
             
-            // Save each node execution one by one
             try {
               await addNodeExecution.mutateAsync({
                 runId: runId,
@@ -264,7 +254,6 @@ export function Toolbar() {
             }
           }
 
-          // Update run status to final state
           const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
           await updateRun.mutateAsync({
             runId: runId,
@@ -276,7 +265,6 @@ export function Toolbar() {
         }
       }
     } catch (error) {
-      // Update run status to failed if we have a runId
       if (runId) {
         try {
           await updateRun.mutateAsync({
@@ -298,36 +286,36 @@ export function Toolbar() {
   };
 
   return (
-    <div className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4">
+    <div className="h-14 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between px-4">
       <div className="flex items-center gap-2">
         <Input
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
-          className="w-48 h-8 text-sm"
+          className="w-48 h-8 text-sm bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
           placeholder="Workflow name"
         />
       </div>
 
       <div className="flex items-center gap-1">
-        {/* Execution Controls */}
         <Button
           variant="default"
           size="sm"
           onClick={handleRunWorkflow}
           disabled={isExecuting}
-          className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+          className="bg-purple-600 hover:bg-purple-700 text-white"
         >
           <Play className="h-4 w-4 mr-2" />
           {isExecuting ? 'Running...' : 'Run All'}
         </Button>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-2 bg-zinc-800" />
 
         <Button
           variant="ghost"
           size="sm"
           onClick={undo}
           disabled={currentIndex <= 0}
+          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           <Undo className="h-4 w-4" />
         </Button>
@@ -336,21 +324,23 @@ export function Toolbar() {
           size="sm"
           onClick={redo}
           disabled={currentIndex >= history.length - 1}
+          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           <Redo className="h-4 w-4" />
         </Button>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-2 bg-zinc-800" />
 
         <Button 
           variant="ghost" 
           size="sm" 
           onClick={handleSave}
           disabled={saveWorkflow.isPending}
+          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           {isSaved ? (
             <>
-              <Check className="h-4 w-4 mr-2 text-green-600" />
+              <Check className="h-4 w-4 mr-2 text-green-400" />
               Saved!
             </>
           ) : (
@@ -363,24 +353,23 @@ export function Toolbar() {
         
         <WorkflowsDialog />
         
-        <Button variant="ghost" size="sm" onClick={handleExport}>
+        <Button variant="ghost" size="sm" onClick={handleExport} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="ghost" size="sm" onClick={handleImport}>
+        <Button variant="ghost" size="sm" onClick={handleImport} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Upload className="h-4 w-4 mr-2" />
           Import
         </Button>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-2 bg-zinc-800" />
 
-        <Button variant="ghost" size="sm" onClick={handleClear}>
+        <Button variant="ghost" size="sm" onClick={handleClear} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Trash2 className="h-4 w-4" />
         </Button>
 
-        <Separator orientation="vertical" className="h-6 mx-2" />
+        <Separator orientation="vertical" className="h-6 mx-2 bg-zinc-800" />
 
-        {/* User Profile & Logout - Using Clerk's UserButton */}
         <UserButton 
           afterSignOutUrl="/sign-in"
           appearance={{

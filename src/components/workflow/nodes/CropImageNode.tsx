@@ -18,7 +18,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
   const setNodeProcessing = useWorkflowStore((state) => state.setNodeProcessing);
   const { getEdges, getNodes } = useReactFlow();
 
-  // History tracking
   const createRun = trpc.execution.createRun.useMutation();
   const updateRun = trpc.execution.updateRun.useMutation();
   const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
@@ -27,14 +26,12 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
     updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
     setNodeProcessing(id, true);
   
-    // Force UI update before heavy processing
     await new Promise(resolve => setTimeout(resolve, 100));
 
     const startTime = Date.now();
     let runId: string | undefined;
 
     try {
-      // Create run entry
       const run = await createRun.mutateAsync({
         runType: 'single',
         nodeCount: 1,
@@ -44,7 +41,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
       const edges = getEdges();
       const nodes = getNodes();
 
-      // Find connected image
       const imageEdge = edges.find((e) => e.target === id && e.targetHandle === 'image_url');
       if (!imageEdge) {
         throw new Error('No image connected. Connect an Image Node to the image_url input.');
@@ -57,13 +53,11 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         throw new Error('Connected image node has no image.');
       }
 
-      // Get crop parameters from data
       let xPercent = data.xPercent ?? 0;
       let yPercent = data.yPercent ?? 0;
       const widthPercent = data.widthPercent ?? 100;
       const heightPercent = data.heightPercent ?? 100;
 
-      // If center crop is enabled, calculate centered position
       if (data.centerCrop) {
         xPercent = (100 - widthPercent) / 2;
         yPercent = (100 - heightPercent) / 2;
@@ -91,13 +85,11 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         throw new Error('Failed to get canvas context');
       }
 
-      // Calculate crop dimensions
       const cropX = Math.floor((xPercent / 100) * img.width);
       const cropY = Math.floor((yPercent / 100) * img.height);
       const cropWidth = Math.floor((widthPercent / 100) * img.width);
       const cropHeight = Math.floor((heightPercent / 100) * img.height);
 
-      // Validate crop dimensions
       if (cropWidth <= 0 || cropHeight <= 0) {
         throw new Error('Invalid crop dimensions. Width and height must be greater than 0.');
       }
@@ -106,24 +98,20 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         throw new Error('Crop area exceeds image boundaries.');
       }
 
-      // Set canvas size to crop dimensions
       canvas.width = cropWidth;
       canvas.height = cropHeight;
 
-      // Draw cropped portion
       ctx.drawImage(
         img,
         cropX, cropY, cropWidth, cropHeight,
         0, 0, cropWidth, cropHeight
       );
 
-      // Convert to data URL
       const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.95);
 
       updateNodeData(id, { result: croppedImageUrl, isLoading: false });
       setNodeProcessing(id, false);
 
-      // Log successful execution
       const duration = Date.now() - startTime;
       await addNodeExecution.mutateAsync({
         runId,
@@ -149,7 +137,6 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         duration,
       });
 
-      // Cleanup
       canvas.remove();
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -181,16 +168,16 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
   };
 
   return (
-    <Card className={`w-80 bg-gradient-to-br from-white to-yellow-50/30 border border-yellow-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
-      <div className="p-4 border-b rounded-t-lg border-yellow-100 bg-gradient-to-r from-yellow-50 to-yellow-100/50 flex items-center gap-3 relative">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-yellow-400 to-yellow-600 flex items-center justify-center shadow-sm">
-          <Crop className="h-4 w-4 text-white" />
+    <Card className={`w-80 bg-zinc-900 border border-zinc-800 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
+      <div className="p-4 border-b border-zinc-800 flex items-center gap-3 relative">
+        <div className="flex items-center justify-center">
+          <Crop className="h-4 w-4 text-zinc-400" />
         </div>
-        <span className="font-bold text-sm text-slate-800">{data.label}</span>
+        <span className="font-semibold text-sm text-white">{data.label}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-red-100 hover:text-red-600"
+          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-zinc-800 hover:text-red-400"
           onClick={() => deleteNode(id)}
         >
           <Trash2 className="h-4 w-4" />
@@ -204,16 +191,16 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
             id={`center-crop-${id}`}
             checked={data.centerCrop ?? false}
             onChange={(e) => updateNodeData(id, { centerCrop: e.target.checked })}
-            className="nodrag h-4 w-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+            className="nodrag h-4 w-4 rounded border-zinc-700 bg-zinc-800 text-yellow-500 focus:ring-yellow-500"
           />
-          <Label htmlFor={`center-crop-${id}`} className="text-xs font-medium cursor-pointer">
+          <Label htmlFor={`center-crop-${id}`} className="text-xs font-medium cursor-pointer text-zinc-300">
             Center Crop
           </Label>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label className="text-xs">X %</Label>
+            <Label className="text-xs text-zinc-400">X %</Label>
             <Input
               type="number"
               min="0"
@@ -221,11 +208,11 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               value={data.xPercent ?? 0}
               onChange={(e) => updateNodeData(id, { xPercent: parseFloat(e.target.value) || 0 })}
               disabled={data.centerCrop}
-              className="nodrag h-8"
+              className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white"
             />
           </div>
           <div>
-            <Label className="text-xs">Y %</Label>
+            <Label className="text-xs text-zinc-400">Y %</Label>
             <Input
               type="number"
               min="0"
@@ -233,29 +220,29 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
               value={data.yPercent ?? 0}
               onChange={(e) => updateNodeData(id, { yPercent: parseFloat(e.target.value) || 0 })}
               disabled={data.centerCrop}
-              className="nodrag h-8"
+              className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white"
             />
           </div>
           <div>
-            <Label className="text-xs">Width %</Label>
+            <Label className="text-xs text-zinc-400">Width %</Label>
             <Input
               type="number"
               min="0"
               max="100"
               value={data.widthPercent ?? 100}
               onChange={(e) => updateNodeData(id, { widthPercent: parseFloat(e.target.value) || 100 })}
-              className="nodrag h-8"
+              className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white"
             />
           </div>
           <div>
-            <Label className="text-xs">Height %</Label>
+            <Label className="text-xs text-zinc-400">Height %</Label>
             <Input
               type="number"
               min="0"
               max="100"
               value={data.heightPercent ?? 100}
               onChange={(e) => updateNodeData(id, { heightPercent: parseFloat(e.target.value) || 100 })}
-              className="nodrag h-8"
+              className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white"
             />
           </div>
         </div>
@@ -263,7 +250,7 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         <Button
           onClick={handleRun}
           disabled={data.isLoading}
-          className="w-full nodrag bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700"
+          className="w-full nodrag bg-yellow-600 hover:bg-yellow-700 text-white"
           size="sm"
         >
           {data.isLoading ? (
@@ -280,25 +267,23 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
         </Button>
 
         {data.error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="bg-red-950 border-red-900">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">{data.error}</AlertDescription>
+            <AlertDescription className="text-xs text-red-400">{data.error}</AlertDescription>
           </Alert>
         )}
 
         {data.result && (
-          <div className="border rounded-lg p-2">
+          <div className="border border-zinc-800 rounded-lg p-2 bg-zinc-800/30">
             <img src={data.result} alt="Cropped" className="w-full rounded" />
-            <p className="text-xs text-slate-500 mt-1">Crop applied successfully</p>
+            <p className="text-xs text-zinc-400 mt-1">Crop applied successfully</p>
           </div>
         )}
       </div>
 
-      {/* Input handle */}
-      <Handle type="target" position={Position.Left} id="image_url" className="w-3 h-3 bg-green-500 border-2 border-white" style={{ top: '50%' }} />
+      <Handle type="target" position={Position.Left} id="image_url" className="w-3 h-3 bg-green-500 border-2 border-zinc-900" style={{ top: '50%' }} />
       
-      {/* Output handle */}
-      <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-yellow-500 border-2 border-white" />
+      <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-yellow-500 border-2 border-zinc-900" />
     </Card>
   );
 }

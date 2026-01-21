@@ -11,7 +11,6 @@ export default function Home() {
   const { saveToHistory } = useWorkflowStore();
 
   useEffect(() => {
-    // Load sample workflow - Product Marketing Kit Generator
     const sampleWorkflow = createSampleWorkflow();
     useWorkflowStore.setState({
       nodes: sampleWorkflow.nodes,
@@ -21,7 +20,7 @@ export default function Home() {
   }, [saveToHistory]);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-100">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#0a0a0a]">
       <Toolbar />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
@@ -32,10 +31,8 @@ export default function Home() {
   );
 }
 
-// Sample workflow: Product Marketing Kit Generator
 function createSampleWorkflow() {
   const nodes = [
-    // Branch A: Image Processing
     {
       id: 'upload-img',
       type: 'image',
@@ -81,7 +78,6 @@ function createSampleWorkflow() {
         model: 'gemini-2.5-flash',
       },
     },
-    // Branch B: Video Processing
     {
       id: 'upload-video',
       type: 'video',
@@ -97,7 +93,6 @@ function createSampleWorkflow() {
         timestamp: '50%',
       },
     },
-    // Convergence: Final Marketing
     {
       id: 'text-final-system',
       type: 'text',
@@ -119,20 +114,15 @@ function createSampleWorkflow() {
   ];
 
   const edges = [
-    // Branch A connections
-    { id: 'e1', source: 'upload-img', target: 'crop-img', targetHandle: 'image_url', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e2', source: 'text-system', target: 'llm-describe', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e3', source: 'text-product', target: 'llm-describe', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e4', source: 'crop-img', target: 'llm-describe', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
-    
-    // Branch B connections
-    { id: 'e5', source: 'upload-video', target: 'extract-frame', targetHandle: 'video_url', animated: true, style: { stroke: '#8b5cf6' } },
-    
-    // Convergence connections
-    { id: 'e6', source: 'text-final-system', target: 'llm-final', targetHandle: 'system_prompt', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e7', source: 'llm-describe', target: 'llm-final', targetHandle: 'user_message', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e8', source: 'crop-img', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
-    { id: 'e9', source: 'extract-frame', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#8b5cf6' } },
+    { id: 'e1', source: 'upload-img', target: 'crop-img', targetHandle: 'image_url', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e2', source: 'text-system', target: 'llm-describe', targetHandle: 'system_prompt', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e3', source: 'text-product', target: 'llm-describe', targetHandle: 'user_message', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e4', source: 'crop-img', target: 'llm-describe', targetHandle: 'images', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e5', source: 'upload-video', target: 'extract-frame', targetHandle: 'video_url', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e6', source: 'text-final-system', target: 'llm-final', targetHandle: 'system_prompt', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e7', source: 'llm-describe', target: 'llm-final', targetHandle: 'user_message', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e8', source: 'crop-img', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#a855f7' } },
+    { id: 'e9', source: 'extract-frame', target: 'llm-final', targetHandle: 'images', animated: true, style: { stroke: '#a855f7' } },
   ];
 
   return { nodes, edges };

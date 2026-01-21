@@ -18,7 +18,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
   const setNodeProcessing = useWorkflowStore((state) => state.setNodeProcessing);
   const { getEdges, getNodes } = useReactFlow();
   
-  // History tracking
   const createRun = trpc.execution.createRun.useMutation();
   const updateRun = trpc.execution.updateRun.useMutation();
   const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
@@ -33,7 +32,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
     let runId: string | undefined;
 
     try {
-      // Create run entry
       const run = await createRun.mutateAsync({
         runType: 'single',
         nodeCount: 1,
@@ -43,7 +41,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
       const edges = getEdges();
       const nodes = getNodes();
 
-      // Find connected video
       const videoEdge = edges.find((e) => e.target === id && e.targetHandle === 'video_url');
       if (!videoEdge) {
         throw new Error('No video connected. Connect a Video Node to the video_url input.');
@@ -56,7 +53,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         throw new Error('Connected video node has no video.');
       }
 
-      // Get timestamp (from connected node or manual input)
       const timestampEdge = edges.find((e) => e.target === id && e.targetHandle === 'timestamp');
       let timestamp = data.timestamp || '0';
       
@@ -65,11 +61,9 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         timestamp = timestampNode?.data?.text || timestampNode?.data?.result || '0';
       }
 
-      // Handle both data URLs and remote URLs
       let processableVideoUrl = videoData;
 
       try {
-        // For remote URLs, we need to download and convert to blob URL
         if (!videoData.startsWith('data:')) {
           const response = await fetch(videoData, {
             mode: 'cors',
@@ -84,7 +78,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           processableVideoUrl = URL.createObjectURL(blob);
         }
 
-        // Extract video from browser using canvas approach
         const video = document.createElement('video');
         video.src = processableVideoUrl;
         video.crossOrigin = 'anonymous';
@@ -93,7 +86,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Video loading timeout'));
-          }, 60000); // 1 minute timeout
+          }, 60000);
 
           video.onloadedmetadata = () => {
             clearTimeout(timeout);
@@ -106,7 +99,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           };
         });
 
-        // Parse timestamp
         let seekTime = 0;
         if (typeof timestamp === 'string' && timestamp.includes('%')) {
           const percent = parseFloat(timestamp.replace('%', ''));
@@ -114,7 +106,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         } else {
           seekTime = parseFloat(timestamp.toString());
         }
-        // Ensure seek time is within bounds
         seekTime = Math.max(0, Math.min(seekTime, video.duration - 0.1));
 
         video.currentTime = seekTime;
@@ -135,7 +126,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           };
         });
 
-        // Extract frame using canvas
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -147,13 +137,11 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        // Convert to data URL
         const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
         updateNodeData(id, { result: frameDataUrl, isLoading: false });
         setNodeProcessing(id, false);
 
-        // Log successful execution
         const duration = Date.now() - startTime;
         await addNodeExecution.mutateAsync({
           runId,
@@ -174,7 +162,6 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
           duration,
         });
 
-        // Cleanup
         video.remove();
         canvas.remove();
         if (processableVideoUrl !== videoData) {
@@ -220,16 +207,16 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
   };
 
   return (
-    <Card className={`w-80 bg-gradient-to-br from-white to-pink-50/30 border border-pink-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
-      <div className="p-4 border-b rounded-t-lg border-pink-100 bg-gradient-to-r from-pink-50 to-pink-100/50 flex items-center gap-3 relative">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-pink-400 to-pink-600 flex items-center justify-center shadow-sm">
-          <Film className="h-4 w-4 text-white" />
+    <Card className={`w-80 bg-zinc-900 border border-zinc-800 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
+      <div className="p-4 border-b border-zinc-800 flex items-center gap-3 relative">
+        <div className="flex items-center justify-center">
+          <Film className="h-4 w-4 text-zinc-400" />
         </div>
-        <span className="font-bold text-sm text-slate-800">{data.label}</span>
+        <span className="font-semibold text-sm text-white">{data.label}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-red-100 hover:text-red-600"
+          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-zinc-800 hover:text-red-400"
           onClick={() => deleteNode(id)}
         >
           <Trash2 className="h-4 w-4" />
@@ -238,22 +225,22 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
 
       <div className="p-4 space-y-3">
         <div>
-          <Label className="text-xs">Timestamp (seconds or %)</Label>
+          <Label className="text-xs text-zinc-400">Timestamp (seconds or %)</Label>
           <Input
             type="text"
             value={data.timestamp}
             onChange={(e) => updateNodeData(id, { timestamp: e.target.value })}
             disabled={hasConnection('timestamp')}
             placeholder="0 or 50%"
-            className="nodrag h-8"
+            className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
           />
-          <p className="text-xs text-slate-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
+          <p className="text-xs text-zinc-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
         </div>
 
         <Button
           onClick={handleRun}
           disabled={data.isLoading}
-          className="w-full nodrag bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700"
+          className="w-full nodrag bg-pink-600 hover:bg-pink-700 text-white"
           size="sm"
         >
           {data.isLoading ? (
@@ -270,25 +257,23 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         </Button>
 
         {data.error && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="bg-red-950 border-red-900">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">{data.error}</AlertDescription>
+            <AlertDescription className="text-xs text-red-400">{data.error}</AlertDescription>
           </Alert>
         )}
 
         {data.result && (
-          <div className="border rounded-lg p-2">
+          <div className="border border-zinc-800 rounded-lg p-2 bg-zinc-800/30">
             <img src={data.result} alt="Extracted frame" className="w-full rounded" />
-            <p className="text-xs text-slate-500 mt-1">Frame extracted successfully</p>
+            <p className="text-xs text-zinc-400 mt-1">Frame extracted successfully</p>
           </div>
         )}
       </div>
 
-      {/* Input handles */}
-      <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-white" style={{ top: '35%' }} />
+      <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-zinc-900" style={{ top: '35%' }} />
       
-      {/* Output handle */}
-      <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-pink-500 border-2 border-white" />
+      <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-pink-500 border-2 border-zinc-900" />
     </Card>
   );
 }

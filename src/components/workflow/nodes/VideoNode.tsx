@@ -20,14 +20,12 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     const validTypes = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-m4v'];
     if (!validTypes.includes(file.type)) {
       setUploadError('Invalid file type. Please upload MP4, MOV, WEBM, or M4V.');
       return;
     }
 
-    // Validate file size (max 50MB)
     if (file.size > 100 * 1024 * 1024) {
       setUploadError('File too large. Maximum size is 50MB.');
       return;
@@ -37,12 +35,10 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
     setUploadError(null);
 
     try {
-      // Create FormData for API request
       const formData = new FormData();
       formData.append('file', file);
       formData.append('type', 'video');
 
-      // Upload via API route
       const response = await fetch('/api/upload', {
         method: 'POST',
         body: formData,
@@ -55,7 +51,6 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
 
       const result = await response.json();
 
-      // For remote videos, download and create blob URL for local playback
       let videoBlobUrl = result.url;
       try {
         const videoResponse = await fetch(result.url);
@@ -94,16 +89,16 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
   };
 
   return (
-    <Card className="w-72 bg-gradient-to-br from-white to-orange-50/30 border border-orange-200/60 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b rounded-t-lg border-orange-100 bg-gradient-to-r from-orange-50 to-orange-100/50 flex items-center gap-3 relative">
-        <div className="h-8 w-8 rounded-lg bg-gradient-to-r from-orange-400 to-orange-600 flex items-center justify-center shadow-sm">
-          <Video className="h-4 w-4 text-white" />
+    <Card className="w-72 bg-zinc-900 border border-zinc-800 shadow-lg hover:shadow-xl transition-all duration-300 group">
+      <div className="p-4 border-b border-zinc-800 flex items-center gap-3 relative">
+        <div className="flex items-center justify-center">
+          <Video className="h-4 w-4 text-zinc-400" />
         </div>
-        <span className="font-bold text-sm text-slate-800">{data.label}</span>
+        <span className="font-semibold text-sm text-white">{data.label}</span>
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-red-100 hover:text-red-600"
+          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity nodrag hover:bg-zinc-800 hover:text-red-400"
           onClick={() => deleteNode(id)}
         >
           <Trash2 className="h-4 w-4" />
@@ -112,13 +107,13 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
 
       <div className="p-4 space-y-3">
         {!data.videoData && !data.videoUrl ? (
-          <div className="border-2 border-dashed border-orange-300/60 rounded-xl p-8 text-center bg-gradient-to-br from-orange-50/50 to-orange-100/30 hover:from-orange-100/50 hover:to-orange-50/50 transition-all duration-300">
+          <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center bg-zinc-800/30 hover:border-zinc-700 transition-all duration-300">
             <Button
               variant="outline"
               size="sm"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="nodrag bg-white/80 hover:bg-white border-orange-300 hover:border-orange-400 transition-all duration-200 shadow-sm"
+              className="nodrag bg-zinc-800 hover:bg-zinc-700 border-zinc-700 hover:border-zinc-600 text-white transition-all duration-200 shadow-sm"
             >
               {isUploading ? (
                 <>
@@ -140,7 +135,7 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
               className="hidden"
               disabled={isUploading}
             />
-            <p className="text-xs text-slate-500 mt-3 font-medium">
+            <p className="text-xs text-zinc-500 mt-3 font-medium">
               MP4, MOV, WEBM, M4V (max 50MB)
             </p>
           </div>
@@ -149,7 +144,7 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
             <video
               src={data.videoData || data.videoUrl}
               controls
-              className="w-full h-40 rounded-lg border border-orange-200 shadow-sm"
+              className="w-full h-40 rounded-lg border border-zinc-800 shadow-sm bg-black"
             />
             <Button
               variant="destructive"
@@ -160,15 +155,15 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
             >
               <X className="h-4 w-4" />
             </Button>
-            <p className="text-xs text-slate-600 mt-2 truncate font-medium">
+            <p className="text-xs text-zinc-400 mt-2 truncate font-medium">
               {data.fileName}
             </p>
           </div>
         )}
 
         {uploadError && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs">{uploadError}</AlertDescription>
+          <Alert variant="destructive" className="bg-red-950 border-red-900">
+            <AlertDescription className="text-xs text-red-400">{uploadError}</AlertDescription>
           </Alert>
         )}
       </div>
@@ -177,7 +172,7 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
         type="source"
         position={Position.Right}
         id="output"
-        className="w-4 h-4 bg-gradient-to-r from-orange-400 to-orange-600 border-2 border-white shadow-sm"
+        className="w-4 h-4 bg-orange-500 border-2 border-zinc-900 shadow-sm"
       />
     </Card>
   );
