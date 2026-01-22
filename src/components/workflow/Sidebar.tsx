@@ -156,14 +156,14 @@ export function Sidebar() {
       </div>
 
       {/* Search */}
-      <div className="p-6">
+      <div className="p-4">
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-500" />
           <Input
             placeholder="Search nodes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-11 h-11 rounded-[6px] bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:ring-zinc-600 transition-all duration-200"
+            className="pl-11 h-8 rounded-[6px] bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:ring-zinc-600 transition-all duration-200"
           />
         </div>
       </div>
