@@ -244,3 +244,22 @@
 .nodrag {
   cursor: auto !important;
 }
+
+/* Dark scrollbar for textarea */
+.scrollbar-dark::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: #3a3a42;
+  border-radius: 8px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background-color: #5d5d5d;
+  border-radius: 8px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background-color: #777474;
+}

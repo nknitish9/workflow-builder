@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export function Sidebar() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const { 
     addTextNode, 
@@ -104,19 +104,19 @@ export function Sidebar() {
 
   if (isCollapsed) {
     return (
-      <div className="w-20 bg-zinc-900 border-r border-zinc-800 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-zinc-800 flex items-center justify-center">
+      <div className="w-14 bg-zinc-900 border-r border-zinc-800 shadow-sm flex flex-col overflow-hidden">
+        <div className="py-4 border-b border-zinc-800 flex items-center justify-center">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setIsCollapsed(false)}
-            className="hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
+            className="h-9 w-9 rounded-[4px] hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="p-3 flex-1 overflow-y-auto overflow-x-hidden">
+        <div className="py-3 flex-1 overflow-y-auto overflow-x-hidden">
           <div className="space-y-3">
             {nodes.map((node) => (
               <div
@@ -127,8 +127,8 @@ export function Sidebar() {
                 onClick={() => handleAddNode(node.type)}
                 title={node.label}
               >
-                <div className="h-12 w-12 rounded-sm flex items-center justify-center shadow-sm hover:shadow-md hover:bg-[#302E33] transition-all duration-300 mx-auto">
-                  <node.icon className="h-6 w-6 text-zinc-400" />
+                <div className="h-9 w-9 rounded-[4px] flex items-center justify-center shadow-sm hover:shadow-md hover:bg-[#302E33] transition-all duration-300 mx-auto">
+                  <node.icon className="h-5 w-5 text-zinc-400" />
                 </div>
               </div>
             ))}
@@ -139,7 +139,7 @@ export function Sidebar() {
   }
 
   return (
-    <div className="w-72 bg-zinc-900 border-r border-zinc-800 shadow-sm flex flex-col">
+    <div className="w-60 bg-zinc-900 border-r border-zinc-800 shadow-sm flex flex-col">
       {/* Header */}
       <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
         <h2 className="text-xl font-bold text-white">
@@ -149,7 +149,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(true)}
-          className="hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
+          className="h-9 w-9 rounded-[4px] hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -163,7 +163,7 @@ export function Sidebar() {
             placeholder="Search nodes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-11 h-11 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:ring-zinc-600 transition-all duration-200"
+            className="pl-11 h-11 rounded-[6px] bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600 focus:border-zinc-600 focus:ring-zinc-600 transition-all duration-200"
           />
         </div>
       </div>
@@ -171,7 +171,7 @@ export function Sidebar() {
       <Separator className="mx-6 bg-zinc-800" />
 
       {/* Quick Access */}
-      <div className="p-6 flex-1 overflow-y-auto">
+      <div className="p-4 flex-1 overflow-y-auto">
         <h3 className="text-sm font-semibold text-zinc-400 mb-4 uppercase tracking-wide">
           Quick Access
         </h3>
@@ -179,14 +179,14 @@ export function Sidebar() {
           {filteredNodes.map((node) => (
             <Card
               key={node.type}
-              className="p-4 cursor-move hover:bg-zinc-800 hover:shadow-md transition-all duration-300 border-zinc-800 bg-zinc-900 group"
+              className="p-3 rounded-[6px] cursor-move hover:bg-zinc-800 hover:shadow-md transition-all duration-300 border-zinc-800 bg-zinc-900 group"
               draggable
               onDragStart={(e) => handleDragStart(e, node.type)}
               onClick={() => handleAddNode(node.type)}
             >
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-zinc-800 flex items-center justify-center shadow-sm group-hover:bg-zinc-700 transition-all duration-300">
-                  <node.icon className="h-6 w-6 text-zinc-400" />
+                <div className="h-9 w-9 rounded-[6px] bg-zinc-800 flex items-center justify-center shadow-sm group-hover:bg-[#302E33] transition-all duration-300">
+                  <node.icon className="h-4 w-4 text-zinc-400" />
                 </div>
                 <div>
                   <p className="font-semibold text-sm text-white transition-colors">

@@ -291,7 +291,7 @@ export function Toolbar() {
         <Input
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
-          className="w-48 h-8 text-sm bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
+          className="w-48 h-8 rounded-[8px] text-sm bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
           placeholder="Workflow name"
         />
       </div>
@@ -302,7 +302,7 @@ export function Toolbar() {
           size="sm"
           onClick={handleRunWorkflow}
           disabled={isExecuting}
-          className="bg-purple-600 hover:bg-purple-700 text-white"
+          className="rounded-[8px] bg-purple-600 hover:bg-purple-700 text-white"
         >
           <Play className="h-4 w-4 mr-2" />
           {isExecuting ? 'Running...' : 'Run All'}
@@ -315,7 +315,7 @@ export function Toolbar() {
           size="sm"
           onClick={undo}
           disabled={currentIndex <= 0}
-          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+          className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           <Undo className="h-4 w-4" />
         </Button>
@@ -324,7 +324,7 @@ export function Toolbar() {
           size="sm"
           onClick={redo}
           disabled={currentIndex >= history.length - 1}
-          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+          className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           <Redo className="h-4 w-4" />
         </Button>
@@ -336,7 +336,7 @@ export function Toolbar() {
           size="sm" 
           onClick={handleSave}
           disabled={saveWorkflow.isPending}
-          className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+          className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800"
         >
           {isSaved ? (
             <>
@@ -350,21 +350,21 @@ export function Toolbar() {
             </>
           )}
         </Button>
-        
+
         <WorkflowsDialog />
-        
-        <Button variant="ghost" size="sm" onClick={handleExport} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
+
+        <Button variant="ghost" size="sm" onClick={handleExport} className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Download className="h-4 w-4 mr-2" />
           Export
         </Button>
-        <Button variant="ghost" size="sm" onClick={handleImport} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
+        <Button variant="ghost" size="sm" onClick={handleImport} className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Upload className="h-4 w-4 mr-2" />
           Import
         </Button>
 
         <Separator orientation="vertical" className="h-6 mx-2 bg-zinc-800" />
 
-        <Button variant="ghost" size="sm" onClick={handleClear} className="text-zinc-400 hover:text-white hover:bg-zinc-800">
+        <Button variant="ghost" size="sm" onClick={handleClear} className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800">
           <Trash2 className="h-4 w-4" />
         </Button>
 

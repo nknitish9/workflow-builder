@@ -15,8 +15,8 @@ function TextNode({ id, data }: NodeProps<TextNodeData>) {
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
 
   return (
-    <Card className="w-[420px] bg-[#212126] border rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
-      <div className="p-5 border-[#3a3a3a] flex items-center gap-3 relative">
+    <Card className="w-[360px] bg-[#212126] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
+      <div className="p-5 flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <Type className="h-4 w-4 text-zinc-400" />
         </div>
@@ -36,7 +36,7 @@ function TextNode({ id, data }: NodeProps<TextNodeData>) {
           value={data.text || ''}
           onChange={(e) => updateNodeData(id, { text: e.target.value })}
           placeholder="Enter text..."
-          className="min-h-[150px] text-base nodrag bg-[#353539] border-[rgba(255,255,255,0.04)] text-white placeholder:text-zinc-600 focus:border-[#4a4a4a] focus:ring-0 rounded-xl leading-relaxed font-normal resize-none"
+          className="min-h-[120px] text-base nodrag bg-[#353539] border-[rgba(255,255,255,0.04)] text-white placeholder:text-zinc-600 focus:border-[#4a4a4a] focus:ring-0 rounded-xl leading-relaxed font-normal resize-none scrollbar-dark"
           rows={8}
           style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
         />

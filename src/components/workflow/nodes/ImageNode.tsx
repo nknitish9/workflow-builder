@@ -77,7 +77,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
 
   return (
     <Card className="w-[420px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
-      <div className="p-5 border-b border-[#3a3a3a] flex items-center gap-3 relative">
+      <div className="p-5 border-[#3a3a3a] flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <ImageIcon className="h-4 w-4 text-zinc-400" />
         </div>
@@ -92,9 +92,9 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
         </Button>
       </div>
 
-      <div className="p-5 space-y-3">
+      <div className="pt-0 px-5 pb-5 space-y-3">
         {!data.imageData && !data.imageUrl ? (
-          <div className="border-2 border-dashed border-[#3a3a3a] rounded-xl p-12 text-center bg-[#1a1a1a] hover:border-[#4a4a4a] transition-all duration-300">
+          <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center bg-[#353539] hover:border-zinc-500 transition-all duration-300">
             <Button
               variant="outline"
               size="sm"

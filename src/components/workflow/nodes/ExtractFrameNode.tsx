@@ -207,8 +207,8 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
   };
 
   return (
-    <Card className={`w-80 bg-zinc-900 border border-zinc-800 shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
-      <div className="p-4 border-b border-zinc-800 flex items-center gap-3 relative">
+    <Card className={`w-[360px] bg-[#212126] shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
+      <div className="p-4 border-zinc-800 flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <Film className="h-4 w-4 text-zinc-400" />
         </div>
@@ -223,39 +223,7 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         </Button>
       </div>
 
-      <div className="p-4 space-y-3">
-        <div>
-          <Label className="text-xs text-zinc-400">Timestamp (seconds or %)</Label>
-          <Input
-            type="text"
-            value={data.timestamp}
-            onChange={(e) => updateNodeData(id, { timestamp: e.target.value })}
-            disabled={hasConnection('timestamp')}
-            placeholder="0 or 50%"
-            className="nodrag h-8 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-600"
-          />
-          <p className="text-xs text-zinc-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
-        </div>
-
-        <Button
-          onClick={handleRun}
-          disabled={data.isLoading}
-          className="w-full nodrag bg-pink-600 hover:bg-pink-700 text-white"
-          size="sm"
-        >
-          {data.isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Extracting...
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4 mr-2" />
-              Run
-            </>
-          )}
-        </Button>
-
+      <div className="pt-0 px-5 pb-5 space-y-3">
         {data.error && (
           <Alert variant="destructive" className="bg-red-950 border-red-900">
             <AlertCircle className="h-4 w-4" />
@@ -264,11 +232,43 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
         )}
 
         {data.result && (
-          <div className="border border-zinc-800 rounded-lg p-2 bg-zinc-800/30">
+          <div className="rounded-lg">
             <img src={data.result} alt="Extracted frame" className="w-full rounded" />
-            <p className="text-xs text-zinc-400 mt-1">Frame extracted successfully</p>
+            <p className="text-xs text-zinc-400 m-1">Frame extracted successfully</p>
           </div>
         )}
+
+        <div>
+          <Label className="text-xs text-zinc-400">Timestamp (seconds or %)</Label>
+          <Input
+            type="text"
+            value={data.timestamp}
+            onChange={(e) => updateNodeData(id, { timestamp: e.target.value })}
+            disabled={hasConnection('timestamp')}
+            placeholder="0 or 50%"
+            className="nodrag rounded-[8px] h-8 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600"
+          />
+          <p className="text-xs text-zinc-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
+        </div>
+
+        <Button
+          onClick={handleRun}
+          disabled={data.isLoading}
+          className="w-2/5 nodrag justify-self-end flex rounded-[8px] nodrag border-[1px] bg-zinc-800 border-zinc-500 hover:bg-zinc-700 text-white"
+          size="sm"
+        >
+          {data.isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Extracting...
+            </>
+          ) : (
+            <span className="flex items-center gap-4">
+              <span >--&gt;</span>
+              <span>Run</span>
+            </span>
+          )}
+        </Button>
       </div>
 
       <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-zinc-900" style={{ top: '35%' }} />

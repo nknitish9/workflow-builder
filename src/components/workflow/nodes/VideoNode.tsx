@@ -89,8 +89,8 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
   };
 
   return (
-    <Card className="w-72 bg-zinc-900 border border-zinc-800 shadow-lg hover:shadow-xl transition-all duration-300 group">
-      <div className="p-4 border-b border-zinc-800 flex items-center gap-3 relative">
+    <Card className="w-[360px] bg-[#212126] shadow-lg hover:shadow-xl transition-all duration-300 group">
+      <div className="p-5 flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <Video className="h-4 w-4 text-zinc-400" />
         </div>
@@ -105,9 +105,9 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
         </Button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="pt-0 px-5 pb-5 space-y-3">
         {!data.videoData && !data.videoUrl ? (
-          <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center bg-zinc-800/30 hover:border-zinc-700 transition-all duration-300">
+          <div className="border-2 border-dashed border-zinc-800 rounded-xl p-8 text-center bg-[#353539] hover:border-zinc-500 transition-all duration-300">
             <Button
               variant="outline"
               size="sm"

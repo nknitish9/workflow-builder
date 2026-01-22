@@ -118,7 +118,7 @@ export function RightSidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setIsCollapsed(false)}
-          className="mb-4 hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
+          className="mb-4 rounded-[8px] hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
           title="Show History"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -147,7 +147,7 @@ export function RightSidebar() {
               size="sm"
               onClick={handleRefresh}
               disabled={isLoading}
-              className="h-8 text-zinc-400 hover:text-white hover:bg-zinc-800"
+              className="rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
@@ -156,7 +156,7 @@ export function RightSidebar() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowClearDialog(true)}
-                className="h-8 text-red-400 hover:text-red-300 hover:bg-zinc-800"
+                className="rounded-[8px] text-red-400 hover:text-red-300 hover:bg-zinc-800"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -165,7 +165,7 @@ export function RightSidebar() {
               variant="ghost"
               size="icon"
               onClick={() => setIsCollapsed(true)}
-              className="hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
+              className="rounded-[8px] hover:bg-zinc-800 transition-all duration-200 text-zinc-400"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -182,7 +182,7 @@ export function RightSidebar() {
             runs.map((run: any) => (
               <Card
                 key={run.id}
-                className="p-4 hover:bg-zinc-800 transition-colors cursor-pointer border-2 border-zinc-800 bg-zinc-900 group"
+                className="p-4 rounded-[8px] hover:bg-zinc-800 transition-colors cursor-pointer border-2 border-zinc-800 bg-zinc-900 group"
                 onClick={() => setExpandedRun(expandedRun === run.id ? null : run.id)}
               >
                 <div className="flex items-start justify-between mb-2">

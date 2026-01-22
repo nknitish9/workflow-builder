@@ -32,7 +32,7 @@ export function WorkflowsDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" className='rounded-[8px] text-zinc-400 hover:text-white hover:bg-zinc-800'>
           <FolderOpen className="h-4 w-4 mr-2" />
           Load
         </Button>
@@ -51,7 +51,7 @@ export function WorkflowsDialog() {
             {workflows.map((workflow: any) => (
               <Card
                 key={workflow.id}
-                className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group"
+                className="p-4 bg-zinc-900 hover:bg-zinc-800 transition-colors cursor-pointer group"
               >
                 <div className="flex items-start justify-between">
                   <div
@@ -59,8 +59,8 @@ export function WorkflowsDialog() {
                     onClick={() => handleLoadWorkflow(workflow)}
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <FileText className="h-4 w-4 text-slate-500" />
-                      <h3 className="font-semibold text-slate-800">{workflow.name}</h3>
+                      <FileText className="h-4 w-4 text-zinc-400" />
+                      <h3 className="font-semibold text-zinnc-400">{workflow.name}</h3>
                     </div>
                     {workflow.description && (
                       <p className="text-sm text-slate-600 mb-2">{workflow.description}</p>
@@ -78,7 +78,7 @@ export function WorkflowsDialog() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-100 hover:text-red-600"
+                    className="rounded-[8px] opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-600"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteWorkflow(workflow.id);

@@ -161,7 +161,7 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
 
   return (
     <Card className={`w-[420px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
-      <div className="p-5 border-b border-[#3a3a3a] flex items-center gap-3 relative">
+      <div className="p-5 border-[#3a3a3a] flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <Bot className="h-4 w-4 text-zinc-400" />
         </div>
@@ -176,9 +176,9 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
         </Button>
       </div>
       
-      <div className="p-5 space-y-4">
+      <div className="pt-0 px-5 pb-5 space-y-4">
         <div>
-          <Label htmlFor={`model-${id}`} className="text-sm font-normal text-zinc-400 mb-2 block">Model</Label>
+          <Label htmlFor={`model-${id}`} className="rpunded-[8px] text-sm font-normal text-zinc-400 mb-2 block">Model</Label>
           <Select
             value={data.model}
             onValueChange={(value) => updateNodeData(id, { model: value })}
@@ -196,25 +196,6 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
           </Select>
         </div>
 
-        <Button
-          onClick={handleRun}
-          disabled={data.isLoading}
-          className="w-full nodrag bg-purple-600 hover:bg-purple-700 text-white shadow-sm hover:shadow-md transition-all duration-200 h-11 rounded-xl font-normal"
-          size="sm"
-        >
-          {data.isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
-              <Play className="h-4 w-4 mr-2" />
-              Run
-            </>
-          )}
-        </Button>
-
         {data.error && (
           <Alert variant="destructive" className="bg-red-950 border-red-900">
             <AlertCircle className="h-4 w-4" />
@@ -223,11 +204,30 @@ function LLMNode({ id, data }: NodeProps<LLMNodeData>) {
         )}
 
         {data.result && (
-          <div className="border border-[#3a3a3a] rounded-xl p-4 bg-[#1a1a1a] max-h-64 overflow-y-auto">
+          <div className="border border-[#3a3a3a] rounded-xl p-4 bg-[#1a1a1a] max-h-64 overflow-y-auto scrollbar-dark">
             <Label className="text-sm text-zinc-400 mb-2 block font-normal">Result:</Label>
             <p className="text-sm text-white whitespace-pre-wrap leading-relaxed font-normal">{data.result}</p>
           </div>
         )}
+
+        <Button
+          onClick={handleRun}
+          disabled={data.isLoading}
+          className="w-2/5 rounded-[8px] nodrag justify-self-end flex nodrag border-[1px] bg-zinc-800 border-zinc-500 hover:bg-zinc-700 text-white shadow-sm hover:shadow-md transition-all duration-200 h-11 font-normal"
+          size="sm"
+        >
+          {data.isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Running...
+            </>
+          ) : (
+            <span className="flex items-center gap-4">
+              <span >--&gt;</span>
+              <span>Run</span>
+            </span>
+          )}
+        </Button>
       </div>
 
       <div className="absolute left-0 top-[30%] -translate-x-1/2 flex items-center">
