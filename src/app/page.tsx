@@ -81,13 +81,13 @@ function createSampleWorkflow() {
     {
       id: 'upload-video',
       type: 'video',
-      position: { x: -70, y: 710 },
+      position: { x: -70, y: 800 },
       data: { label: 'Product Demo Video' },
     },
     {
       id: 'extract-frame',
       type: 'extract',
-      position: { x: 324, y: 700 },
+      position: { x: 324, y: 750 },
       data: {
         label: 'Extract Frame',
         timestamp: '50%',

@@ -76,7 +76,7 @@ function ImageNode({ id, data }: NodeProps<ImageNodeData>) {
   };
 
   return (
-    <Card className="w-[420px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
+    <Card className="w-[360px] bg-[#2a2a2a] border border-[#3a3a3a] rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 group">
       <div className="p-5 border-[#3a3a3a] flex items-center gap-3 relative">
         <div className="flex items-center justify-center">
           <ImageIcon className="h-4 w-4 text-zinc-400" />
