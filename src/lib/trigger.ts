@@ -1,11 +1,12 @@
-import { TriggerClient } from '@trigger.dev/sdk';
+import { task } from "@trigger.dev/sdk/v3";
 
 if (!process.env.TRIGGER_SECRET_KEY) {
-  throw new Error('Missing TRIGGER_SECRET_KEY');
+  throw new Error("Missing TRIGGER_SECRET_KEY");
 }
 
-export const trigger = new TriggerClient({
-  id: process.env.TRIGGER_PROJECT_ID || 'workflow-builder',
-  apiKey: process.env.TRIGGER_SECRET_KEY,
-  apiUrl: process.env.TRIGGER_API_URL,
+export const trigger = task({
+  id: "workflow-builder",
+  run: async (payload) => {
+    console.log("Trigger task running", payload);
+  },
 });

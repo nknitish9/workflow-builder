@@ -22,7 +22,7 @@
     "@radix-ui/react-separator": "^1.0.3",
     "@radix-ui/react-slot": "^1.0.2",
     "@tanstack/react-query": "^5.17.19",
-    "@trigger.dev/sdk": "^4.3.3",
+    "@trigger.dev/sdk": "4.3.3",
     "@trpc/client": "^11.0.0-next-beta.253",
     "@trpc/next": "^11.0.0-next-beta.253",
     "@trpc/react-query": "^11.0.0-next-beta.253",
@@ -46,7 +46,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
-    "@trigger.dev/cli": "^3.3.12",
+    "@trigger.dev/cli": "4.3.3",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^20",
     "@types/react": "^19",
