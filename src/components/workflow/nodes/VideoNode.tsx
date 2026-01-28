@@ -27,7 +27,7 @@ function VideoNode({ id, data }: NodeProps<VideoNodeData>) {
     }
 
     if (file.size > 100 * 1024 * 1024) {
-      setUploadError('File too large. Maximum size is 50MB.');
+      setUploadError('File too large. Maximum size is 100MB.');
       return;
     }
 

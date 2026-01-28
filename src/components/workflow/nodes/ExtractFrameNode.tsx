@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,197 +9,116 @@ import { Label } from '@/components/ui/label';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { ExtractFrameNodeData } from '@/types/nodes';
 import { trpc } from '@/lib/trpc/client';
-import { Film, Play, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { Film, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
-  const setNodeProcessing = useWorkflowStore((state) => state.setNodeProcessing);
   const { getEdges, getNodes } = useReactFlow();
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+
+  const executeSingleNode = trpc.execution.executeSingleNode.useMutation();
   
-  const createRun = trpc.execution.createRun.useMutation();
-  const updateRun = trpc.execution.updateRun.useMutation();
-  const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
+  const { data: runStatus } = trpc.execution.getRun.useQuery(
+    { runId: pollingRunId || '' },
+    { 
+      enabled: !!pollingRunId,
+      refetchInterval: pollingRunId ? 2000 : false,
+    }
+  );
 
   const handleRun = async () => {
-    updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
-    setNodeProcessing(id, true);
-
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    const startTime = Date.now();
-    let runId: string | undefined;
-
+    updateNodeData(id, { isLoading: true, error: undefined, result: undefined, isProcessing: true });
     try {
-      const run = await createRun.mutateAsync({
-        runType: 'single',
-        nodeCount: 1,
-      });
-      runId = run.id;
-
       const edges = getEdges();
       const nodes = getNodes();
 
+      // Recursively collect ALL transitive dependencies
+      const collectDependencies = (nodeId: string, visited = new Set<string>()): any[] => {
+        if (visited.has(nodeId)) return [];
+        visited.add(nodeId);
+
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return [];
+
+        const dependencies = [node];
+
+        // Find all incoming edges to this node
+        const incomingEdges = edges.filter(e => e.target === nodeId);
+
+        // Recursively collect dependencies for each source node
+        incomingEdges.forEach(edge => {
+          const deps = collectDependencies(edge.source, visited);
+          dependencies.push(...deps);
+        });
+
+        return dependencies;
+      };
+
+      // Validate video input exists
       const videoEdge = edges.find((e) => e.target === id && e.targetHandle === 'video_url');
       if (!videoEdge) {
         throw new Error('No video connected. Connect a Video Node to the video_url input.');
       }
 
-      const videoNode = nodes.find((n) => n.id === videoEdge.source);
-      const videoData = videoNode?.data?.videoData || videoNode?.data?.videoUrl;
+      // Get all dependencies for current node (excluding itself)
+      const allDependencies = collectDependencies(id);
+      const dependencies = allDependencies.filter(n => n.id !== id);
 
-      if (!videoData) {
-        throw new Error('Connected video node has no video.');
+      // Get all edges that connect these dependencies
+      const dependencyIds = new Set(allDependencies.map(n => n.id));
+      const relevantEdges = edges.filter(e => 
+        dependencyIds.has(e.source) && dependencyIds.has(e.target)
+      );
+
+      const currentNode = nodes.find(n => n.id === id);
+      if (!currentNode) {
+        throw new Error('Current node not found');
       }
 
-      const timestampEdge = edges.find((e) => e.target === id && e.targetHandle === 'timestamp');
-      let timestamp = data.timestamp || '0';
-      
-      if (timestampEdge) {
-        const timestampNode = nodes.find((n) => n.id === timestampEdge.source);
-        timestamp = timestampNode?.data?.text || timestampNode?.data?.result || '0';
-      }
-
-      let processableVideoUrl = videoData;
-
-      try {
-        if (!videoData.startsWith('data:')) {
-          const response = await fetch(videoData, {
-            mode: 'cors',
-            credentials: 'omit'
-          });
-
-          if (!response.ok) {
-            throw new Error(`Failed to fetch video: ${response.status} ${response.statusText}`);
-          }
-
-          const blob = await response.blob();
-          processableVideoUrl = URL.createObjectURL(blob);
-        }
-
-        const video = document.createElement('video');
-        video.src = processableVideoUrl;
-        video.crossOrigin = 'anonymous';
-        video.preload = 'metadata';
-
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Video loading timeout'));
-          }, 60000);
-
-          video.onloadedmetadata = () => {
-            clearTimeout(timeout);
-            resolve(null);
-          };
-
-          video.onerror = (e) => {
-            clearTimeout(timeout);
-            reject(new Error('Failed to load video metadata'));
-          };
-        });
-
-        let seekTime = 0;
-        if (typeof timestamp === 'string' && timestamp.includes('%')) {
-          const percent = parseFloat(timestamp.replace('%', ''));
-          seekTime = (percent / 100) * video.duration;
-        } else {
-          seekTime = parseFloat(timestamp.toString());
-        }
-        seekTime = Math.max(0, Math.min(seekTime, video.duration - 0.1));
-
-        video.currentTime = seekTime;
-
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Seek timeout'));
-          }, 10000);
-
-          video.onseeked = () => {
-            clearTimeout(timeout);
-            resolve(null);
-          };
-
-          video.onerror = (e) => {
-            clearTimeout(timeout);
-            reject(new Error('Seek failed'));
-          };
-        });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          throw new Error('Failed to get canvas context');
-        }
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const frameDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-        updateNodeData(id, { result: frameDataUrl, isLoading: false });
-        setNodeProcessing(id, false);
-
-        const duration = Date.now() - startTime;
-        await addNodeExecution.mutateAsync({
-          runId,
-          nodeId: id,
-          nodeType: 'extract',
-          status: 'success',
-          inputs: { timestamp } as any,
-          outputs: {
-            result: 'Frame extracted successfully',
-            size: frameDataUrl.length,
-          },
-          duration,
-        });
-
-        await updateRun.mutateAsync({
-          runId,
-          status: 'success',
-          duration,
-        });
-
-        video.remove();
-        canvas.remove();
-        if (processableVideoUrl !== videoData) {
-          URL.revokeObjectURL(processableVideoUrl);
-        }
-
-        return;
-      } catch (canvasError) {
-        throw new Error(`Failed to extract frame from video: ${canvasError instanceof Error ? canvasError.message : 'Unknown error'}. Try with a smaller video file or different format.`);
-      }
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      if (runId) {
-        await addNodeExecution.mutateAsync({
-          runId,
-          nodeId: id,
-          nodeType: 'extract',
-          status: 'failed',
-          inputs: {},
-          error: error instanceof Error ? error.message : 'Unknown error',
-          duration,
-        });
-
-        await updateRun.mutateAsync({
-          runId,
-          status: 'failed',
-          duration,
-        });
-      }
-
-      updateNodeData(id, {
-        error: error instanceof Error ? error.message : 'Failed to extract frame',
-        isLoading: false,
+      const result = await executeSingleNode.mutateAsync({
+        node: currentNode,
+        dependencies,
+        edges: relevantEdges,
       });
-      setNodeProcessing(id, false);
+
+      setPollingRunId(result.runId);
+    } catch (error) {
+      updateNodeData(id, {
+        error: error instanceof Error ? error.message : 'Failed to run node',
+        isLoading: false,
+        isProcessing: false,
+      });
     }
   };
+
+  React.useEffect(() => {
+    if (!runStatus || !pollingRunId) return;
+
+    if (['success', 'failed', 'partial'].includes(runStatus.status)) {
+      const execution = runStatus.nodeExecutions?.find((e: any) => e.nodeId === id);
+      
+      if (execution) {
+        if (execution.status === 'success') {
+          updateNodeData(id, {
+            result: (execution.outputs as any)?.result || 'Success',
+            isLoading: false,
+            isProcessing: false,
+            error: undefined,
+          });
+        } else {
+          updateNodeData(id, {
+            error: execution.error || 'Failed',
+            isLoading: false,
+            isProcessing: false,
+          });
+        }
+      }
+
+      setPollingRunId(null);
+    }
+  }, [runStatus, pollingRunId, id, updateNodeData]);
 
   const hasConnection = (handle: string) => {
     const edges = useReactFlow().getEdges();
@@ -237,44 +156,43 @@ function ExtractFrameNode({ id, data }: NodeProps<ExtractFrameNodeData>) {
             <p className="text-xs text-zinc-400 m-1">Frame extracted successfully</p>
           </div>
         )}
+      <div>
+      <Label className="text-xs text-zinc-400">Timestamp (seconds or %)</Label>
+      <Input
+        type="text"
+        value={data.timestamp}
+        onChange={(e) => updateNodeData(id, { timestamp: e.target.value })}
+        disabled={hasConnection('timestamp')}
+        placeholder="0 or 50%"
+        className="nodrag rounded-[8px] h-8 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600"
+      />
+      <p className="text-xs text-zinc-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
+    </div>
 
-        <div>
-          <Label className="text-xs text-zinc-400">Timestamp (seconds or %)</Label>
-          <Input
-            type="text"
-            value={data.timestamp}
-            onChange={(e) => updateNodeData(id, { timestamp: e.target.value })}
-            disabled={hasConnection('timestamp')}
-            placeholder="0 or 50%"
-            className="nodrag rounded-[8px] h-8 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-600"
-          />
-          <p className="text-xs text-zinc-500 mt-1">e.g., "5" for 5 seconds or "50%" for middle</p>
-        </div>
+    <Button
+      onClick={handleRun}
+      disabled={data.isLoading}
+      className="w-2/5 nodrag justify-self-end flex rounded-[8px] border-[1px] bg-zinc-800 border-zinc-500 hover:bg-zinc-700 text-white"
+      size="sm"
+    >
+      {data.isLoading ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Running...
+        </>
+      ) : (
+        <span className="flex items-center gap-4">
+          <span>--&gt;</span>
+          <span>Run</span>
+        </span>
+      )}
+    </Button>
+  </div>
 
-        <Button
-          onClick={handleRun}
-          disabled={data.isLoading}
-          className="w-2/5 nodrag justify-self-end flex rounded-[8px] nodrag border-[1px] bg-zinc-800 border-zinc-500 hover:bg-zinc-700 text-white"
-          size="sm"
-        >
-          {data.isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Extracting...
-            </>
-          ) : (
-            <span className="flex items-center gap-4">
-              <span >--&gt;</span>
-              <span>Run</span>
-            </span>
-          )}
-        </Button>
-      </div>
-
-      <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-zinc-900" style={{ top: '35%' }} />
-      
-      <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-pink-500 border-2 border-zinc-900" />
-    </Card>
+  <Handle type="target" position={Position.Left} id="video_url" className="w-3 h-3 bg-orange-500 border-2 border-zinc-900" style={{ top: '35%' }} />
+  
+  <Handle type="source" position={Position.Right} id="output" className="w-3 h-3 bg-pink-500 border-2 border-zinc-900" />
+</Card>
   );
 }
 

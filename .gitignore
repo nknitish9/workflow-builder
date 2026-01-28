@@ -37,3 +37,45 @@ next-env.d.ts
 
 # prisma
 prisma/migrations
+
+# Trigger.dev
+.trigger
+*.trigger.dev
+
+# Turbo
+.turbo
+
+# OS
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Cache directories
+.cache
+.parcel-cache
+.npm
+.yarn
+
+# Testing
+.coverage
+coverage/
+*.lcov
+
+# Sentry
+.sentryclirc
+
+# Bundle analyzer
+.next/analyze/

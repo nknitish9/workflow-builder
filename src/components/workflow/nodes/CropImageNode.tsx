@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from 'reactflow';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,163 +9,119 @@ import { Label } from '@/components/ui/label';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { CropImageNodeData } from '@/types/nodes';
 import { trpc } from '@/lib/trpc/client';
-import { Crop, Play, Loader2, AlertCircle, Trash2 } from 'lucide-react';
+import { Crop, Loader2, AlertCircle, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
   const updateNodeData = useWorkflowStore((state) => state.updateNodeData);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
-  const setNodeProcessing = useWorkflowStore((state) => state.setNodeProcessing);
   const { getEdges, getNodes } = useReactFlow();
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
 
-  const createRun = trpc.execution.createRun.useMutation();
-  const updateRun = trpc.execution.updateRun.useMutation();
-  const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
-
-  const handleRun = async () => {
-    updateNodeData(id, { isLoading: true, error: undefined, result: undefined });
-    setNodeProcessing(id, true);
+  const executeSingleNode = trpc.execution.executeSingleNode.useMutation();
   
-    await new Promise(resolve => setTimeout(resolve, 100));
+  // Poll for run status
+  const { data: runStatus } = trpc.execution.getRun.useQuery(
+    { runId: pollingRunId || '' },
+    { 
+      enabled: !!pollingRunId,
+      refetchInterval: pollingRunId ? 2000 : false,
+    }
+  );
 
-    const startTime = Date.now();
-    let runId: string | undefined;
-
+  // Server-side execution via Trigger.dev
+  const handleRun = async () => {
+    updateNodeData(id, { isLoading: true, error: undefined, result: undefined, isProcessing: true });
     try {
-      const run = await createRun.mutateAsync({
-        runType: 'single',
-        nodeCount: 1,
-      });
-      runId = run.id;
-
       const edges = getEdges();
       const nodes = getNodes();
 
+      // Recursively collect ALL transitive dependencies
+      const collectDependencies = (nodeId: string, visited = new Set<string>()): any[] => {
+        if (visited.has(nodeId)) return [];
+        visited.add(nodeId);
+
+        const node = nodes.find(n => n.id === nodeId);
+        if (!node) return [];
+
+        const dependencies = [node];
+
+        // Find all incoming edges to this node
+        const incomingEdges = edges.filter(e => e.target === nodeId);
+
+        // Recursively collect dependencies for each source node
+        incomingEdges.forEach(edge => {
+          const deps = collectDependencies(edge.source, visited);
+          dependencies.push(...deps);
+        });
+
+        return dependencies;
+      };
+
+      // Validate image input exists
       const imageEdge = edges.find((e) => e.target === id && e.targetHandle === 'image_url');
       if (!imageEdge) {
         throw new Error('No image connected. Connect an Image Node to the image_url input.');
       }
 
-      const imageNode = nodes.find((n) => n.id === imageEdge.source);
-      const imageData = imageNode?.data?.imageData || imageNode?.data?.imageUrl || imageNode?.data?.result;
+      // Get all dependencies for current node (excluding itself)
+      const allDependencies = collectDependencies(id);
+      const dependencies = allDependencies.filter(n => n.id !== id);
 
-      if (!imageData) {
-        throw new Error('Connected image node has no image.');
-      }
-
-      let xPercent = data.xPercent ?? 0;
-      let yPercent = data.yPercent ?? 0;
-      const widthPercent = data.widthPercent ?? 100;
-      const heightPercent = data.heightPercent ?? 100;
-
-      if (data.centerCrop) {
-        xPercent = (100 - widthPercent) / 2;
-        yPercent = (100 - heightPercent) / 2;
-      }
-
-      const img = new Image();
-      if (!imageData.startsWith('data:')) {
-        img.crossOrigin = 'anonymous';
-      }
-      
-      await new Promise((resolve, reject) => {
-        img.onload = () => {
-          resolve(null);
-        };
-        img.onerror = (err) => {
-          reject(new Error('Failed to load image'));
-        };
-        img.src = imageData;
-      });
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      if (!ctx) {
-        throw new Error('Failed to get canvas context');
-      }
-
-      const cropX = Math.floor((xPercent / 100) * img.width);
-      const cropY = Math.floor((yPercent / 100) * img.height);
-      const cropWidth = Math.floor((widthPercent / 100) * img.width);
-      const cropHeight = Math.floor((heightPercent / 100) * img.height);
-
-      if (cropWidth <= 0 || cropHeight <= 0) {
-        throw new Error('Invalid crop dimensions. Width and height must be greater than 0.');
-      }
-
-      if (cropX + cropWidth > img.width || cropY + cropHeight > img.height) {
-        throw new Error('Crop area exceeds image boundaries.');
-      }
-
-      canvas.width = cropWidth;
-      canvas.height = cropHeight;
-
-      ctx.drawImage(
-        img,
-        cropX, cropY, cropWidth, cropHeight,
-        0, 0, cropWidth, cropHeight
+      // Get all edges that connect these dependencies
+      const dependencyIds = new Set(allDependencies.map(n => n.id));
+      const relevantEdges = edges.filter(e => 
+        dependencyIds.has(e.source) && dependencyIds.has(e.target)
       );
 
-      const croppedImageUrl = canvas.toDataURL('image/jpeg', 0.95);
-
-      updateNodeData(id, { result: croppedImageUrl, isLoading: false });
-      setNodeProcessing(id, false);
-
-      const duration = Date.now() - startTime;
-      await addNodeExecution.mutateAsync({
-        runId,
-        nodeId: id,
-        nodeType: 'crop',
-        status: 'success',
-        inputs: {
-          xPercent,
-          yPercent,
-          widthPercent,
-          heightPercent,
-        },
-        outputs: {
-          result: 'Cropped image generated',
-          size: croppedImageUrl.length,
-        },
-        duration,
-      });
-
-      await updateRun.mutateAsync({
-        runId,
-        status: 'success',
-        duration,
-      });
-
-      canvas.remove();
-    } catch (error) {
-      const duration = Date.now() - startTime;
-
-      if (runId) {
-        await addNodeExecution.mutateAsync({
-          runId,
-          nodeId: id,
-          nodeType: 'crop',
-          status: 'failed',
-          inputs: {},
-          error: error instanceof Error ? error.message : 'Unknown error',
-          duration,
-        });
-
-        await updateRun.mutateAsync({
-          runId,
-          status: 'failed',
-          duration,
-        });
+      const currentNode = nodes.find(n => n.id === id);
+      if (!currentNode) {
+        throw new Error('Current node not found');
       }
 
-      updateNodeData(id, {
-        error: error instanceof Error ? error.message : 'Failed to crop image',
-        isLoading: false,
+      const result = await executeSingleNode.mutateAsync({
+        node: currentNode,
+        dependencies,
+        edges: relevantEdges,
       });
-      setNodeProcessing(id, false);
+
+      setPollingRunId(result.runId);
+
+    } catch (error) {
+      updateNodeData(id, {
+        error: error instanceof Error ? error.message : 'Failed to run node',
+        isLoading: false,
+        isProcessing: false,
+      });
     }
   };
+
+  React.useEffect(() => {
+    if (!runStatus || !pollingRunId) return;
+
+    if (['success', 'failed', 'partial'].includes(runStatus.status)) {
+      const execution = runStatus.nodeExecutions?.find((e: any) => e.nodeId === id);
+      
+      if (execution) {
+        if (execution.status === 'success') {
+          updateNodeData(id, {
+            result: (execution.outputs as any)?.result || 'Success',
+            isLoading: false,
+            isProcessing: false,
+            error: undefined,
+          });
+        } else {
+          updateNodeData(id, {
+            error: execution.error || 'Failed',
+            isLoading: false,
+            isProcessing: false,
+          });
+        }
+      }
+
+      setPollingRunId(null);
+    }
+  }, [runStatus, pollingRunId, id, updateNodeData]);
 
   return (
     <Card className={`w-[360px] bg-[#212126] shadow-lg hover:shadow-xl transition-all duration-300 group ${data.isLoading || data.isProcessing ? 'processing' : ''}`}>
@@ -270,11 +226,11 @@ function CropImageNode({ id, data }: NodeProps<CropImageNodeData>) {
           {data.isLoading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Cropping...
+              Running...
             </>
           ) : (
             <span className="flex items-center gap-4">
-              <span >--&gt;</span>
+              <span>--&gt;</span>
               <span>Run</span>
             </span>
           )}

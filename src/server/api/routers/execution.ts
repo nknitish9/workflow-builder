@@ -1,8 +1,130 @@
 import { createTRPCRouter, protectedProcedure } from '@/server/api/trpc';
 import { z } from 'zod';
 import { currentUser, auth } from '@clerk/nextjs/server';
+import { workflowOrchestratorTask } from '@/trigger/workflowOrchestrator';
 
 export const executionRouter = createTRPCRouter({
+  executeWorkflow: protectedProcedure
+    .input(
+      z.object({
+        nodes: z.array(z.any()),
+        edges: z.array(z.any()),
+        runType: z.enum(['full', 'partial', 'single']),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { userId: clerkUserId } = await auth();
+      const clerkUser = await currentUser();
+      
+      if (!clerkUserId || !clerkUser) {
+        throw new Error('User not authenticated');
+      }
+
+      const user = await ctx.db.user.upsert({
+        where: { clerkId: clerkUserId },
+        update: {},
+        create: {
+          clerkId: clerkUserId,
+          email: clerkUser.emailAddresses[0]?.emailAddress || `${clerkUserId}@temp.com`,
+        },
+      });
+
+      // Create workflow run
+      const run = await ctx.db.workflowRun.create({
+        data: {
+          userId: user.id,
+          status: 'running',
+          runType: input.runType,
+          nodeCount: input.nodes.length,
+        },
+      });
+
+      // Trigger the orchestrator task
+      try {
+        const handle = await workflowOrchestratorTask.trigger({
+          nodes: input.nodes,
+          edges: input.edges,
+          runId: run.id,
+        });
+
+        return {
+          runId: run.id,
+          taskId: handle.id,
+        };
+      } catch (error) {
+        // Update run as failed if trigger fails
+        await ctx.db.workflowRun.update({
+          where: { id: run.id },
+          data: {
+            status: 'failed',
+            completedAt: new Date(),
+          },
+        });
+        throw error;
+      }
+    }),
+
+  // Single node execution
+  executeSingleNode: protectedProcedure
+  .input(
+    z.object({
+      node: z.any(),
+      dependencies: z.array(z.any()),
+      edges: z.array(z.any()),
+    })
+  )
+  .mutation(async ({ ctx, input }) => {
+    const { userId: clerkUserId } = await auth();
+    const clerkUser = await currentUser();
+    
+    if (!clerkUserId || !clerkUser) {
+      throw new Error('User not authenticated');
+    }
+
+    const user = await ctx.db.user.upsert({
+      where: { clerkId: clerkUserId },
+      update: {},
+      create: {
+        clerkId: clerkUserId,
+        email: clerkUser.emailAddresses[0]?.emailAddress || `${clerkUserId}@temp.com`,
+      },
+    });
+
+    const run = await ctx.db.workflowRun.create({
+      data: {
+        userId: user.id,
+        status: 'running',
+        runType: 'single',
+        nodeCount: 1,
+      },
+    });
+
+    const allNodes = [...input.dependencies, input.node];
+
+    try {
+      const handle = await workflowOrchestratorTask.trigger({
+        nodes: allNodes,
+        edges: input.edges,
+        runId: run.id,
+        targetNodeId: input.node.id,
+      });
+
+      return {
+        runId: run.id,
+        taskId: handle.id,
+      };
+    } catch (error) {
+      await ctx.db.workflowRun.update({
+        where: { id: run.id },
+        data: {
+          status: 'failed',
+          completedAt: new Date(),
+        },
+      });
+      throw error;
+    }
+  }),
+
   createRun: protectedProcedure
     .input(
       z.object({
@@ -151,7 +273,6 @@ export const executionRouter = createTRPCRouter({
       return run;
     }),
 
-  // Delete a single run
   deleteRun: protectedProcedure
     .input(z.object({ runId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -168,7 +289,6 @@ export const executionRouter = createTRPCRouter({
 
       if (!user) throw new Error('User not found');
 
-      // Verify ownership before deleting
       const run = await ctx.db.workflowRun.findUnique({
         where: { id: input.runId },
       });
@@ -184,7 +304,6 @@ export const executionRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  // Clear all history for current user
   clearHistory: protectedProcedure
     .mutation(async ({ ctx }) => {
       const { userId: clerkUserId } = await auth();

@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { useWorkflowStore } from '@/store/workflowStore';
 import { trpc } from '@/lib/trpc/client';
 import { WorkflowsDialog } from './WorkflowsDialog';
-import { WorkflowExecutor } from '@/lib/workflowExecutor';
 import { UserButton } from '@clerk/nextjs';
 import {
   Save,
@@ -18,7 +17,7 @@ import {
   Check,
   Play,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 // Helper function to strip binary data from nodes before saving
 function stripBinaryData(nodes: any[]) {
@@ -56,15 +55,86 @@ function stripBinaryData(nodes: any[]) {
 }
 
 export function Toolbar() {
-  const { nodes, edges, undo, redo, clearWorkflow, history, currentIndex, setNodeProcessing, updateNodeData } = useWorkflowStore();
+  const { nodes, edges, undo, redo, clearWorkflow, history, currentIndex, updateNodeData } = useWorkflowStore();
   const [workflowName, setWorkflowName] = useState('My Workflow');
   const [isSaved, setIsSaved] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [pollingRunId, setPollingRunId] = useState<string | null>(null);
+  const processedExecutionsRef = useRef<Set<string>>(new Set());
+  const isProcessingWorkflowRef = useRef(false);
   
   const saveWorkflow = trpc.workflow.create.useMutation();
-  const createRun = trpc.execution.createRun.useMutation();
-  const updateRun = trpc.execution.updateRun.useMutation();
-  const addNodeExecution = trpc.execution.addNodeExecution.useMutation();
+  const executeWorkflow = trpc.execution.executeWorkflow.useMutation();
+
+  // Use tRPC query with proper polling
+  const { data: runStatus } = trpc.execution.getRun.useQuery(
+    { runId: pollingRunId || '' },
+    { 
+      enabled: !!pollingRunId,
+      refetchInterval: pollingRunId ? 2000 : false,
+    }
+  );
+
+  useEffect(() => {
+    if (!runStatus || !pollingRunId) return;
+    
+    // Prevent re-entrant calls
+    if (isProcessingWorkflowRef.current) return;
+    isProcessingWorkflowRef.current = true;
+
+    // Update nodes with results
+    if (runStatus.nodeExecutions && runStatus.nodeExecutions.length > 0) {
+      runStatus.nodeExecutions.forEach((execution: any) => {
+        // Create unique key for deduplication
+        const executionKey = `${execution.nodeId}-${execution.executedAt}`;
+        
+        if (processedExecutionsRef.current.has(executionKey)) {
+          return; // Skip already processed
+        }
+        
+        processedExecutionsRef.current.add(executionKey);
+        
+        const node = nodes.find(n => n.id === execution.nodeId);
+        if (node) {
+          if (execution.status === 'success') {
+            let result = (execution.outputs as any)?.result;
+            if ((execution.outputs as any)?.type === 'media') {
+              result = 'Media output (check History for details)';
+            }
+            
+            updateNodeData(execution.nodeId, {
+              result: result || 'Success',
+              isProcessing: false,
+              isLoading: false,
+              error: undefined,
+            });
+          } else if (execution.status === 'failed') {
+            updateNodeData(execution.nodeId, {
+              error: execution.error || 'Failed',
+              isProcessing: false,
+              isLoading: false,
+            });
+          }
+        }
+      });
+    }
+
+    // Check if workflow is complete
+    if (['success', 'failed', 'partial'].includes(runStatus.status)) {
+      nodes.forEach(node => {
+        updateNodeData(node.id, {
+          isProcessing: false,
+          isLoading: false,
+        });
+      });
+      
+      setPollingRunId(null);
+      setIsExecuting(false);
+      processedExecutionsRef.current.clear();
+    }
+    
+    isProcessingWorkflowRef.current = false;
+  }, [runStatus, pollingRunId, nodes, updateNodeData]);
 
   const handleSave = async () => {
     try {
@@ -138,150 +208,73 @@ export function Toolbar() {
     const nodesToRun = selectedNodes.length > 0 ? selectedNodes : nodes;
     
     if (nodesToRun.length === 0) {
+      alert('No nodes to run');
       return;
     }
 
     setIsExecuting(true);
-    const startTime = Date.now();
+    
+    // Clear the tracking refs when starting new execution
+    processedExecutionsRef.current.clear();
+    isProcessingWorkflowRef.current = false;
 
-    let runId: string | null = null;
-    try {
-      const run = await createRun.mutateAsync({
-        runType: selectedNodes.length > 0 ? 'partial' : 'full',
-        nodeCount: nodesToRun.length,
+    // Set all nodes to processing state in one batch
+    nodesToRun.forEach(node => {
+      updateNodeData(node.id, { 
+        isProcessing: true, 
+        isLoading: true,
+        error: undefined,
+        result: undefined,
       });
-      runId = run.id;
-    } catch (dbError) {
-      console.warn('Failed to create run record:', dbError);
-    }
+    });
 
     try {
+      // Filter edges to only include those between nodes we're running
       const nodeIds = new Set(nodesToRun.map(n => n.id));
       const relevantEdges = edges.filter(e => 
         nodeIds.has(e.source) && nodeIds.has(e.target)
       );
+      
+      // Trigger server-side execution
+      const result = await executeWorkflow.mutateAsync({
+        nodes: nodesToRun,
+        edges: relevantEdges,
+        runType: selectedNodes.length > 0 ? 'partial' : 'full',
+      });
 
-      const executor = new WorkflowExecutor(nodesToRun, relevantEdges);
+      // Start polling by setting the run ID
+      setPollingRunId(result.runId);
 
-      const results = await executor.execute((nodeId, status) => {
-        if (status === 'running') {
-          setNodeProcessing(nodeId, true);
-          updateNodeData(nodeId, { 
-            isProcessing: true, 
-            isLoading: true,
-            error: undefined 
-          });
-        } else if (status === 'success') {
-          const executorResults = (executor as any).results;
-          const result = executorResults.get(nodeId);
-          
-          setTimeout(() => {
-            setNodeProcessing(nodeId, false);
-            updateNodeData(nodeId, { 
+      // Set timeout for polling (3 minutes)
+      setTimeout(() => {
+        if (pollingRunId === result.runId) {
+          setPollingRunId(null);
+          setIsExecuting(false);
+          processedExecutionsRef.current.clear();
+          nodesToRun.forEach(node => {
+            updateNodeData(node.id, { 
               isProcessing: false, 
               isLoading: false,
-              result: result,
-              error: undefined 
+              error: 'Execution timeout (3 min)'
             });
-          }, 300);
-        } else if (status === 'failed') {
-          setTimeout(() => {
-            setNodeProcessing(nodeId, false);
-            updateNodeData(nodeId, { 
-              isProcessing: false, 
-              isLoading: false 
-            });
-          }, 300);
-        }
-      });
-
-      results.forEach((result, nodeId) => {
-        if (result.status === 'success' && result.output) {
-          updateNodeData(nodeId, { 
-            result: result.output, 
-            error: undefined,
-            isProcessing: false,
-            isLoading: false 
           });
-        } else if (result.status === 'failed' && result.error) {
-          updateNodeData(nodeId, { 
-            error: result.error, 
-            result: undefined,
-            isProcessing: false,
-            isLoading: false 
-          });
+          alert('Workflow execution timed out after 3 minutes');
         }
-      });
-
-      const duration = Date.now() - startTime;
-      const successCount = Array.from(results.values()).filter(r => r.status === 'success').length;
-
-      if (runId) {
-        try {
-          for (const [nodeId, result] of results) {
-            const node = nodes.find(n => n.id === nodeId);
-            
-            let outputForDb;
-            if (result.output) {
-              if (typeof result.output === 'string' && result.output.startsWith('data:')) {
-                outputForDb = { 
-                  type: 'media',
-                  format: result.output.substring(0, 30),
-                  size: result.output.length 
-                };
-              } else if (typeof result.output === 'string' && result.output.length > 1000) {
-                outputForDb = { 
-                  result: result.output.substring(0, 1000) + '... (truncated)'
-                };
-              } else {
-                outputForDb = { result: String(result.output).substring(0, 1000) };
-              }
-            }
-            
-            try {
-              await addNodeExecution.mutateAsync({
-                runId: runId,
-                nodeId,
-                nodeType: node?.type || 'unknown',
-                status: result.status,
-                inputs: node?.data || {},
-                outputs: outputForDb,
-                error: result.error,
-                duration: result.duration,
-              });
-            } catch (nodeError) {
-              console.error(`✗ Failed to save node ${nodeId}:`, nodeError);
-            }
-          }
-
-          const hasFailures = Array.from(results.values()).some(r => r.status === 'failed');
-          await updateRun.mutateAsync({
-            runId: runId,
-            status: hasFailures ? (successCount > 0 ? 'partial' : 'failed') : 'success',
-            duration,
-          });
-        } catch (dbError) {
-          console.error('Failed to save execution history:', dbError);
-        }
-      }
+      }, 3 * 60 * 1000);
+      
     } catch (error) {
-      if (runId) {
-        try {
-          await updateRun.mutateAsync({
-            runId: runId,
-            status: 'failed',
-            duration: Date.now() - startTime,
-          });
-        } catch (updateError) {
-          console.error('Failed to update run status:', updateError);
-        }
-      }
-    } finally {
-      setIsExecuting(false);
-      nodes.forEach(node => {
-        setNodeProcessing(node.id, false);
-        updateNodeData(node.id, { isProcessing: false, isLoading: false });
+      nodesToRun.forEach(node => {
+        updateNodeData(node.id, { 
+          isProcessing: false, 
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Execution failed'
+        });
       });
+      
+      setIsExecuting(false);
+      setPollingRunId(null);
+      processedExecutionsRef.current.clear();
+      alert(`Failed to start workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

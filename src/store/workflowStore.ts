@@ -196,10 +196,21 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   updateNodeData: (nodeId, data) => {
-    set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, data: { ...node.data, ...data } } : node
-      ),
+    set((state) => {
+      let changed = false;
+
+      const nodes = state.nodes.map((node) => {
+        if (node.id === nodeId) {
+          const newData = { ...node.data, ...data };
+          if (JSON.stringify(newData) !== JSON.stringify(node.data)) {
+            changed = true;
+            return { ...node, data: newData };
+          }
+        }
+        return node;
+      });
+
+      return changed ? { nodes } : state;
     });
   },
 
