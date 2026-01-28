@@ -1,5 +1,5 @@
 import { task } from "@trigger.dev/sdk/v3";
-import { cropImageViaTransloadit } from '@/lib/transloaditHelpers';
+import { cropImageViaTransloadit } from '../lib/transloaditHelpers';
 
 export const cropImageTask = task({
   id: 'crop-image',
@@ -21,3 +21,5 @@ export const cropImageTask = task({
     return { croppedImageUrl };
   },
 });
+
+export default cropImageTask;

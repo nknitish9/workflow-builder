@@ -1,5 +1,5 @@
 import { task } from '@trigger.dev/sdk/v3';
-import { extractFrameViaTransloadit } from '@/lib/transloaditHelpers';
+import { extractFrameViaTransloadit } from '../lib/transloaditHelpers';
 
 export const extractFrameTask = task({
   id: 'extract-frame',
@@ -15,3 +15,5 @@ export const extractFrameTask = task({
     return { frameImageUrl };
   },
 });
+
+export default extractFrameTask;

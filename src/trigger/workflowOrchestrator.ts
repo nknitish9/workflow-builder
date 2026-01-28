@@ -348,3 +348,5 @@ export const workflowOrchestratorTask = task({
     };
   },
 });
+
+export default workflowOrchestratorTask;

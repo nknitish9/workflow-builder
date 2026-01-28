@@ -1,5 +1,5 @@
 import { task } from '@trigger.dev/sdk/v3';
-import { runGemini } from '@/lib/gemini';
+import { runGemini } from '../lib/gemini';
 
 export const runLLMTask = task({
   id: 'run-llm',
@@ -13,3 +13,5 @@ export const runLLMTask = task({
     return { result };
   },
 });
+
+export default runLLMTask;
