@@ -3,7 +3,7 @@ import { runLLMTask } from "./llm";
 import { cropImageTask } from "./crop-image";
 import { extractFrameTask } from "./extract-frame";
 import type { Node, Edge } from "reactflow";
-import { db } from "@/server/db";
+const { db } = await import("@/server/db");
 
 interface WorkflowExecutionPayload {
   nodes: Node[];

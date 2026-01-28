@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "trigger:build": "prisma generate"
+    "trigger:build": "prisma generate",
+    "trigger:dev": "trigger.dev@latest dev",
+    "trigger:deploy": "trigger.dev@latest deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.10.0",
