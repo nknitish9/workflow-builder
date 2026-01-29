@@ -82,39 +82,69 @@ export function Toolbar() {
     if (isProcessingWorkflowRef.current) return;
     isProcessingWorkflowRef.current = true;
 
-    // Update nodes with results
+    // Update nodes based on their actual execution
     if (runStatus.nodeExecutions && runStatus.nodeExecutions.length > 0) {
+      // Track which nodes are in which state
+      const runningNodes = new Set<string>();
+      const completedNodes = new Set<string>();
+      
       runStatus.nodeExecutions.forEach((execution: any) => {
-        // Create unique key for deduplication
         const executionKey = `${execution.nodeId}-${execution.executedAt}`;
         
-        if (processedExecutionsRef.current.has(executionKey)) {
-          return; // Skip already processed
+        if (execution.status === 'running') {
+          runningNodes.add(execution.nodeId);
+        } else if (execution.status === 'success' || execution.status === 'failed') {
+          completedNodes.add(execution.nodeId);
+          
+          // Skip if already processed
+          if (processedExecutionsRef.current.has(executionKey)) {
+            return;
+          }
+          
+          processedExecutionsRef.current.add(executionKey);
+          
+          const node = nodes.find(n => n.id === execution.nodeId);
+          if (node) {
+            if (execution.status === 'success') {
+              let result = (execution.outputs as any)?.result;
+              if ((execution.outputs as any)?.type === 'media') {
+                result = 'Media output (check History for details)';
+              }
+              
+              updateNodeData(execution.nodeId, {
+                result: result || 'Success',
+                isProcessing: false,
+                isLoading: false,
+                error: undefined,
+              });
+            } else if (execution.status === 'failed') {
+              updateNodeData(execution.nodeId, {
+                error: execution.error || 'Failed',
+                isProcessing: false,
+                isLoading: false,
+              });
+            }
+          }
+        }
+      });
+      
+      // UPDATE RUNNING NODES
+      nodes.forEach(node => {
+        if (completedNodes.has(node.id)) {
+          return;
         }
         
-        processedExecutionsRef.current.add(executionKey);
-        
-        const node = nodes.find(n => n.id === execution.nodeId);
-        if (node) {
-          if (execution.status === 'success') {
-            let result = (execution.outputs as any)?.result;
-            if ((execution.outputs as any)?.type === 'media') {
-              result = 'Media output (check History for details)';
-            }
-            
-            updateNodeData(execution.nodeId, {
-              result: result || 'Success',
-              isProcessing: false,
-              isLoading: false,
-              error: undefined,
-            });
-          } else if (execution.status === 'failed') {
-            updateNodeData(execution.nodeId, {
-              error: execution.error || 'Failed',
-              isProcessing: false,
-              isLoading: false,
-            });
-          }
+        if (runningNodes.has(node.id)) {
+          updateNodeData(node.id, {
+            isProcessing: true,
+            isLoading: true,
+          });
+        } else if (runStatus.status === 'running') {
+          // Workflow is still running but this node hasn't started
+          updateNodeData(node.id, {
+            isProcessing: false,
+            isLoading: false,
+          });
         }
       });
     }
@@ -218,13 +248,12 @@ export function Toolbar() {
     processedExecutionsRef.current.clear();
     isProcessingWorkflowRef.current = false;
 
-    // Set all nodes to processing state in one batch
     nodesToRun.forEach(node => {
       updateNodeData(node.id, { 
-        isProcessing: true, 
-        isLoading: true,
         error: undefined,
         result: undefined,
+        isProcessing: false,
+        isLoading: false,
       });
     });
 

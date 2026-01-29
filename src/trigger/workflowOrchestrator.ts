@@ -132,6 +132,18 @@ export const workflowOrchestratorTask = task({
         continue;
       }
 
+      //  Create running record before execution
+      const executionRecord = await db.nodeExecution.create({
+        data: {
+          workflowRunId: runId,
+          nodeId,
+          nodeType: node.type || 'unknown',
+          status: 'running',
+          inputs: node.data,
+          duration: 0,
+        },
+      });
+
       const startTime = Date.now();
       try {
         let output: any;
@@ -275,25 +287,18 @@ export const workflowOrchestratorTask = task({
           duration,
         });
 
-        // Only save to database if this node was actually executed (not cached)
-        if (!targetNodeId || nodeId === targetNodeId || duration > 0) {
-          await db.nodeExecution.create({
-            data: {
-              workflowRunId: runId,
-              nodeId,
-              nodeType: node.type || 'unknown',
-              status: 'success',
-              inputs: node.data,
-              outputs: output && typeof output === 'string' && output.startsWith('data:')
-                ? { type: 'media', size: output.length }
-                : output && typeof output === 'string' && output.length > 1000
-                ? { result: output.substring(0, 1000) + '...' }
-                : { result: String(output).substring(0, 1000) },
-              duration,
-            },
-          });
-        }
-
+        await db.nodeExecution.update({
+          where: { id: executionRecord.id },
+          data: {
+            status: 'success',
+            outputs: output && typeof output === 'string' && output.startsWith('data:')
+              ? { type: 'media', size: output.length }
+              : output && typeof output === 'string' && output.length > 1000
+              ? { result: output.substring(0, 1000) + '...' }
+              : { result: String(output).substring(0, 1000) },
+            duration,
+          },
+        });
       } catch (error) {
         hasFailures = true;
         const duration = Date.now() - startTime;
@@ -308,13 +313,10 @@ export const workflowOrchestratorTask = task({
           duration,
         });
 
-        await db.nodeExecution.create({
+        await db.nodeExecution.update({
+          where: { id: executionRecord.id },
           data: {
-            workflowRunId: runId,
-            nodeId,
-            nodeType: node.type || 'unknown',
             status: 'failed',
-            inputs: node.data,
             error: errorMessage,
             duration,
           },
