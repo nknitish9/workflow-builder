@@ -11,7 +11,7 @@
     "postinstall": "prisma generate",
     "trigger:build": "prisma generate",
     "trigger:dev": "npx trigger.dev@latest dev",
-    "trigger:deploy": "npx trigger.dev@latest deploy"
+    "trigger:deploy": "prisma generate && npx trigger.dev@latest deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.10.0",
