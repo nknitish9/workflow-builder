@@ -19,165 +19,6 @@ interface NodeExecutionResult {
   duration: number;
 }
 
-async function executeNode(
-  node: Node,
-  nodeOutputs: Map<string, any>,
-  edges: Edge[],
-  db: any,
-  runId: string
-): Promise<NodeExecutionResult> {
-  const startTime = Date.now();
-  
-  try {
-    let output: any;
-    
-    switch (node.type) {
-      case 'text':
-        output = node.data.text;
-        break;
-
-      case 'image':
-        output = node.data.imageData || node.data.imageUrl;
-        break;
-
-      case 'video':
-        output = node.data.videoUrl || node.data.videoData;
-        break;
-
-      case 'crop':
-        const cropImageEdge = edges.find(
-          e => e.target === node.id && e.targetHandle === 'image_url'
-        );
-        if (!cropImageEdge) {
-          throw new Error('No image connected to crop node');
-        }
-
-        const imageData = nodeOutputs.get(cropImageEdge.source);
-        if (!imageData) {
-          throw new Error('Connected image node has no output');
-        }
-
-        const cropResult = await cropImageTask.triggerAndWait({
-          imageUrl: imageData,
-          xPercent: node.data.xPercent ?? 0,
-          yPercent: node.data.yPercent ?? 0,
-          widthPercent: node.data.widthPercent ?? 100,
-          heightPercent: node.data.heightPercent ?? 100,
-        });
-
-        if (!cropResult.ok) {
-          throw cropResult.error || new Error('Crop task failed');
-        }
-
-        output = cropResult.output?.croppedImageUrl;
-        break;
-
-      case 'extract':
-        const videoEdge = edges.find(
-          e => e.target === node.id && e.targetHandle === 'video_url'
-        );
-        if (!videoEdge) {
-          throw new Error('No video connected to extract node');
-        }
-
-        const videoData = nodeOutputs.get(videoEdge.source);
-        if (!videoData) {
-          throw new Error('Connected video node has no output');
-        }
-
-        const timestampEdge = edges.find(
-          e => e.target === node.id && e.targetHandle === 'timestamp'
-        );
-        let timestamp = node.data.timestamp || '0';
-        if (timestampEdge) {
-          timestamp = nodeOutputs.get(timestampEdge.source) || '0';
-        }
-
-        const extractResult = await extractFrameTask.triggerAndWait({
-          videoUrl: videoData,
-          timestamp,
-        });
-
-        if (!extractResult.ok) {
-          throw extractResult.error || new Error('Extract frame task failed');
-        }
-
-        output = extractResult.output?.frameImageUrl;
-        break;
-
-      case 'llm':
-        const systemPromptEdge = edges.find(
-          e => e.target === node.id && e.targetHandle === 'system_prompt'
-        );
-        const systemPrompt = systemPromptEdge
-          ? nodeOutputs.get(systemPromptEdge.source)
-          : '';
-
-        const userMessageEdge = edges.find(
-          e => e.target === node.id && e.targetHandle === 'user_message'
-        );
-        const userMessage = userMessageEdge
-          ? nodeOutputs.get(userMessageEdge.source)
-          : '';
-
-        if (!userMessage) {
-          throw new Error('No user message provided to LLM node');
-        }
-
-        const imageEdges = edges.filter(
-          e => e.target === node.id && e.targetHandle === 'images'
-        );
-        const images = imageEdges
-          .map(edge => {
-            const imageData = nodeOutputs.get(edge.source);
-            if (imageData && imageData.startsWith('data:')) {
-              const base64Data = imageData.split(',')[1];
-              const mimeType = imageData.match(/data:(.*?);/)?.[1] || 'image/jpeg';
-              return { mimeType, data: base64Data };
-            }
-            return null;
-          })
-          .filter(Boolean) as Array<{ mimeType: string; data: string }>;
-
-        const llmResult = await runLLMTask.triggerAndWait({
-          model: node.data.model || 'gemini-2.5-flash',
-          systemPrompt: systemPrompt || undefined,
-          userMessage: userMessage,
-          images: images.length > 0 ? images : undefined,
-        });
-
-        if (!llmResult.ok) {
-          throw llmResult.error || new Error('LLM task failed');
-        }
-
-        output = llmResult.output?.result;
-        break;
-
-      default:
-        throw new Error(`Unknown node type: ${node.type}`);
-    }
-
-    const duration = Date.now() - startTime;
-    return {
-      nodeId: node.id,
-      status: 'success',
-      output,
-      duration,
-    };
-
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    
-    return {
-      nodeId: node.id,
-      status: 'failed',
-      error: errorMessage,
-      duration,
-    };
-  }
-}
-
 export const workflowOrchestratorTask = task({
   id: 'workflow-orchestrator',
   run: async (payload: WorkflowExecutionPayload, { ctx }) => {
@@ -212,9 +53,8 @@ export const workflowOrchestratorTask = task({
     });
 
     const completed = new Set<string>();
-    const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-    // Execute nodes dynamically - process ready nodes immediately after dependencies complete
+    // Execute nodes in waves with TRUE parallel execution
     while (completed.size < nodes.length) {
       // Find all nodes ready to execute (all dependencies completed)
       const readyNodes = nodes.filter(node => {
@@ -300,64 +140,276 @@ export const workflowOrchestratorTask = task({
         )
       );
 
-      // Serialized execution due to platform constraints
-      for (let i = 0; i < nodesToExecute.length; i++) {
-        const node = nodesToExecute[i]!;
+      // Parallel execution: Trigger all tasks simultaneously
+      const taskPromises = nodesToExecute.map(async (node, i) => {
         const executionRecord = executionRecords[i]!;
+        const startTime = Date.now();
 
         try {
-          const result = await executeNode(node, nodeOutputs, edges, db, runId);
+          let taskHandle: any;
+          let taskType: 'crop' | 'extract' | 'llm' | 'simple';
+          let output: any;
 
-          if (result.status === 'success') {
-            nodeOutputs.set(node.id, result.output);
-            completed.add(node.id);
-            results.set(node.id, result);
+          switch (node.type) {
+            case 'text':
+              taskType = 'simple';
+              output = node.data.text;
+              return {
+                nodeId: node.id,
+                recordId: executionRecord.id,
+                output,
+                taskType,
+                startTime,
+                duration: Date.now() - startTime,
+              };
 
-            await db.nodeExecution.update({
-              where: { id: executionRecord.id },
-              data: {
-                status: 'success',
-                outputs: result.output && typeof result.output === 'string' && result.output.startsWith('data:')
-                  ? { type: 'media', size: result.output.length }
-                  : result.output && typeof result.output === 'string' && result.output.length > 1000
-                  ? { result: result.output.substring(0, 1000) + '...' }
-                  : { result: String(result.output).substring(0, 1000) },
-                duration: result.duration,
-              },
-            });
-          } else {
-            hasFailures = true;
-            completed.add(node.id);
-            results.set(node.id, result);
+            case 'image':
+              taskType = 'simple';
+              output = node.data.imageData || node.data.imageUrl;
+              return {
+                nodeId: node.id,
+                recordId: executionRecord.id,
+                output,
+                taskType,
+                startTime,
+                duration: Date.now() - startTime,
+              };
 
-            await db.nodeExecution.update({
-              where: { id: executionRecord.id },
-              data: {
-                status: 'failed',
-                error: result.error,
-                duration: result.duration,
-              },
-            });
+            case 'video':
+              taskType = 'simple';
+              output = node.data.videoUrl || node.data.videoData;
+              return {
+                nodeId: node.id,
+                recordId: executionRecord.id,
+                output,
+                taskType,
+                startTime,
+                duration: Date.now() - startTime,
+              };
+
+            case 'crop':
+              const cropImageEdge = edges.find(
+                e => e.target === node.id && e.targetHandle === 'image_url'
+              );
+              if (!cropImageEdge) throw new Error('No image connected to crop node');
+              const imageData = nodeOutputs.get(cropImageEdge.source);
+              if (!imageData) throw new Error('Connected image node has no output');
+
+              taskHandle = await cropImageTask.trigger({
+                imageUrl: imageData,
+                xPercent: node.data.xPercent ?? 0,
+                yPercent: node.data.yPercent ?? 0,
+                widthPercent: node.data.widthPercent ?? 100,
+                heightPercent: node.data.heightPercent ?? 100,
+              });
+              taskType = 'crop';
+              break;
+
+            case 'extract':
+              const videoEdge = edges.find(
+                e => e.target === node.id && e.targetHandle === 'video_url'
+              );
+              if (!videoEdge) throw new Error('No video connected to extract node');
+              const videoData = nodeOutputs.get(videoEdge.source);
+              if (!videoData) throw new Error('Connected video node has no output');
+
+              const timestampEdge = edges.find(
+                e => e.target === node.id && e.targetHandle === 'timestamp'
+              );
+              let timestamp = node.data.timestamp || '0';
+              if (timestampEdge) {
+                timestamp = nodeOutputs.get(timestampEdge.source) || '0';
+              }
+
+              taskHandle = await extractFrameTask.trigger({
+                videoUrl: videoData,
+                timestamp,
+              });
+              taskType = 'extract';
+              break;
+
+            case 'llm':
+              const systemPromptEdge = edges.find(
+                e => e.target === node.id && e.targetHandle === 'system_prompt'
+              );
+              const systemPrompt = systemPromptEdge
+                ? nodeOutputs.get(systemPromptEdge.source)
+                : '';
+
+              const userMessageEdge = edges.find(
+                e => e.target === node.id && e.targetHandle === 'user_message'
+              );
+              const userMessage = userMessageEdge
+                ? nodeOutputs.get(userMessageEdge.source)
+                : '';
+
+              if (!userMessage) throw new Error('No user message provided to LLM node');
+
+              const imageEdges = edges.filter(
+                e => e.target === node.id && e.targetHandle === 'images'
+              );
+              const images = imageEdges
+                .map(edge => {
+                  const imageData = nodeOutputs.get(edge.source);
+                  if (imageData && imageData.startsWith('data:')) {
+                    const base64Data = imageData.split(',')[1];
+                    const mimeType = imageData.match(/data:(.*?);/)?.[1] || 'image/jpeg';
+                    return { mimeType, data: base64Data };
+                  }
+                  return null;
+                })
+                .filter(Boolean) as Array<{ mimeType: string; data: string }>;
+
+              // Trigger without waiting
+              taskHandle = await runLLMTask.trigger({
+                model: node.data.model || 'gemini-2.5-flash',
+                systemPrompt: systemPrompt || undefined,
+                userMessage: userMessage,
+                images: images.length > 0 ? images : undefined,
+              });
+              taskType = 'llm';
+              break;
+
+            default:
+              throw new Error(`Unknown node type: ${node.type}`);
           }
-        } catch (error) {
-          hasFailures = true;
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const result: NodeExecutionResult = {
+
+          // Return metadata for async tasks
+          return {
             nodeId: node.id,
-            status: 'failed',
-            error: errorMessage,
-            duration: 0,
+            recordId: executionRecord.id,
+            taskHandle,
+            taskType,
+            startTime,
           };
 
-          completed.add(node.id);
-          results.set(node.id, result);
+        } catch (error) {
+          const duration = Date.now() - startTime;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          return {
+            nodeId: node.id,
+            recordId: executionRecord.id,
+            error: errorMessage,
+            taskType: 'simple' as const,
+            startTime,
+            duration,
+          };
+        }
+      });
+
+      const triggeredTasks = await Promise.all(taskPromises);
+
+      const completedTasks = await Promise.all(
+        triggeredTasks.map(async (task) => {
+          // If it's a simple task or already errored, return immediately
+          if (task.taskType === 'simple' || task.error || task.duration !== undefined) {
+            return task;
+          }
+
+          // Import runs module for polling
+          const { runs } = await import("@trigger.dev/sdk/v3");
+
+          // Poll for async task completion
+          let attempts = 0;
+          const maxAttempts = 180; // 3 minutes max
+
+          while (attempts < maxAttempts) {
+            try {
+              // Use runs.retrieve to check status
+              const run = await runs.retrieve(task.taskHandle.id);
+              
+              if (run.status === 'COMPLETED') {
+                return {
+                  ...task,
+                  output: run.output,
+                  duration: Date.now() - task.startTime,
+                };
+              } else if (run.status === 'FAILED' || run.status === 'CRASHED' || run.status === 'SYSTEM_FAILURE') {
+                return {
+                  ...task,
+                  error: run.error?.message || 'Task failed',
+                  duration: Date.now() - task.startTime,
+                };
+              } else if (run.status === 'CANCELED') {
+                return {
+                  ...task,
+                  error: `Task ${run.status.toLowerCase()}`,
+                  duration: Date.now() - task.startTime,
+                };
+              }
+
+              // Still running, wait before next poll
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              attempts++;
+            } catch (error) {
+              return {
+                ...task,
+                error: error instanceof Error ? error.message : 'Polling failed',
+                duration: Date.now() - task.startTime,
+              };
+            }
+          }
+
+          // Timeout
+          return {
+            ...task,
+            error: 'Task timeout (3 minutes)',
+            duration: Date.now() - task.startTime,
+          };
+        })
+      );
+
+      // ✅ Update database and store outputs for all completed tasks
+      for (const task of completedTasks) {
+        if (task.error) {
+          hasFailures = true;
+          completed.add(task.nodeId);
+          results.set(task.nodeId, {
+            nodeId: task.nodeId,
+            status: 'failed',
+            error: task.error,
+            duration: task.duration || 0,
+          });
 
           await db.nodeExecution.update({
-            where: { id: executionRecord.id },
+            where: { id: task.recordId },
             data: {
               status: 'failed',
-              error: errorMessage,
-              duration: result.duration,
+              error: task.error,
+              duration: task.duration || 0,
+            },
+          });
+        } else {
+          // Extract output based on task type
+          let output = task.output;
+          if (task.taskType === 'crop') {
+            output = task.output?.croppedImageUrl;
+          } else if (task.taskType === 'extract') {
+            output = task.output?.frameImageUrl;
+          } else if (task.taskType === 'llm') {
+            output = task.output?.result;
+          }
+
+          nodeOutputs.set(task.nodeId, output);
+          completed.add(task.nodeId);
+          results.set(task.nodeId, {
+            nodeId: task.nodeId,
+            status: 'success',
+            output,
+            duration: task.duration || 0,
+          });
+
+          await db.nodeExecution.update({
+            where: { id: task.recordId },
+            data: {
+              status: 'success',
+              outputs: output && typeof output === 'string' && output.startsWith('data:')
+                ? { type: 'media', size: output.length }
+                : output && typeof output === 'string' && output.length > 1000
+                ? { result: output.substring(0, 1000) + '...' }
+                : { result: String(output).substring(0, 1000) },
+              duration: task.duration || 0,
             },
           });
         }
