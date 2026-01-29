@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "next dev --turbo",
     "dev:trigger": "trigger.dev dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "trigger:build": "prisma generate",
     "trigger:dev": "trigger.dev@latest dev",
-    "trigger:deploy": "trigger.dev@latest deploy"
+    "trigger:deploy": "prisma generate && trigger.dev@latest deploy"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.10.0",
