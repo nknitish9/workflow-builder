@@ -3,7 +3,6 @@ import { runLLMTask } from "./llm";
 import { cropImageTask } from "./crop-image";
 import { extractFrameTask } from "./extract-frame";
 import type { Node, Edge } from "reactflow";
-const { db } = await import("@/server/db");
 
 interface WorkflowExecutionPayload {
   nodes: Node[];
@@ -23,6 +22,7 @@ interface NodeExecutionResult {
 export const workflowOrchestratorTask = task({
   id: 'workflow-orchestrator',
   run: async (payload: WorkflowExecutionPayload, { ctx }) => {
+    const { db } = await import("@/server/db");
     const { nodes, edges, runId, targetNodeId } = payload;
     const results = new Map<string, NodeExecutionResult>();
     const nodeOutputs = new Map<string, any>();
