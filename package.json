@@ -48,6 +48,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@trigger.dev/build": "4.3.3",
     "@trigger.dev/cli": "latest",
     "@trigger.dev/sdk": "^4",
     "@types/fluent-ffmpeg": "^2.1.28",
